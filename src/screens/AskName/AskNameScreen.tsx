@@ -17,6 +17,7 @@ import AppButton from "../../components/common/AppButton";
 import AuthInput from "../../components/auth/AuthInput";
 
 import { saveUserName } from "../../services/storageService";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AskName">;
 
@@ -47,33 +48,25 @@ const AskNameScreen = ({ navigation }: Props) => {
   const isValid = name.trim().length > 0;
 
   return (
+    <SafeAreaView style={styles.container}>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.content}>
-
-        <FontText
-          variant="display"
-          style={styles.title}
-        >
+        <FontText variant="display" style={styles.title}>
           What do you want
           {"\n"}
           to be called?
         </FontText>
 
-        <FontText
-          variant="body"
-          style={styles.description}
-        >
-          We'll use your name to make your Knowly
-          experience feel a little more personal.
+        <FontText variant="body" style={styles.description}>
+          Your name is used to personalize your experience
         </FontText>
 
         <View style={styles.inputContainer}>
           <AuthInput
-            label="Your name"
-            placeholder="Enter your name"
+            placeholder="Your name"
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -90,6 +83,7 @@ const AskNameScreen = ({ navigation }: Props) => {
         loading={loading}
       />
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -98,7 +92,7 @@ export default AskNameScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#262626',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xxl,
     paddingBottom: spacing.lg,
@@ -131,15 +125,17 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 36,
-    lineHeight: 43,
-    color: colors.text,
+    fontSize: 34,
+    lineHeight: 42,
+    color: colors.white,
+    textAlign: "center",
   },
 
   description: {
     marginTop: spacing.md,
-    color: colors.textSecondary,
+    color: colors.white,
     lineHeight: 24,
+    textAlign: "center",
   },
 
   inputContainer: {

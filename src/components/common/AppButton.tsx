@@ -60,11 +60,6 @@ const AppButton = ({
             {loading ? "Please wait..." : title}
           </FontText>
 
-          {!loading && (
-            <FontText style={styles.arrow}>
-              →
-            </FontText>
-          )}
         </View>
       </Pressable>
     </Animated.View>
@@ -74,7 +69,7 @@ const AppButton = ({
 const styles = StyleSheet.create({
   button: {
     height: rw(55),
-    borderRadius: rr(17),
+    borderRadius: rr(100),
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",

@@ -1,10 +1,10 @@
 import { rf } from "./responsive";
 
 export const fonts = {
-  regular: "Inter-Regular",
-  medium: "Inter-Medium",
-  semiBold: "Inter-SemiBold",
-  bold: "Inter-Bold",
+  regular: "Roboto-Regular",
+  medium: "Roboto-Medium",
+  semiBold: "Roboto-SemiBold",
+  bold: "Roboto-Bold",
 };
 
 export const typography = {
