@@ -5,16 +5,21 @@ import React, {
 } from "react";
 
 import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
   ActivityIndicator,
   Alert,
   Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { clearOnboardingData } from "../../services/storageService";
 import { supabase } from "../../lib/supabase";
+
+import FontText from "../../components/common/FontText";
 
 import { colors } from "../../constant/colors";
 import { spacing } from "../../constant/spacing";
@@ -25,19 +30,29 @@ import {
   rr,
 } from "../../constant/responsive";
 
-import FontText from "../../components/common/FontText";
+import type { RootStackParamList } from "../../types/navigation";
+
+type ProfileNavigationProp =
+  NativeStackNavigationProp<RootStackParamList>;
+
+type ProfileScreenProps = {
+  navigation: ProfileNavigationProp;
+};
 
 type Profile = {
   username: string | null;
-  avatar_url: string | null;
+  email: string | null;
 };
 
-const ProfileScreen = () => {
-  const [email, setEmail] = useState("");
+const ProfileScreen = ({
+  navigation,
+}: ProfileScreenProps) => {
   const [profile, setProfile] =
     useState<Profile | null>(null);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
+
   const [loggingOut, setLoggingOut] =
     useState(false);
 
@@ -57,30 +72,35 @@ const ProfileScreen = () => {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
-        return;
+      if (userError) {
+        throw userError;
       }
 
-      setEmail(user.email ?? "");
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } =
         await supabase
           .from("profiles")
-          .select("username, avatar_url")
+          .select("username, email")
           .eq("id", user.id)
           .single();
 
       if (error) {
-        console.error(
-          "Error loading profile:",
-          error,
-        );
-        return;
+        throw error;
       }
 
-      setProfile(data);
+      setProfile({
+        username:
+          data?.username ?? "Knowledge Explorer",
+        email:
+          data?.email ?? user.email ?? "",
+      });
 
       Animated.parallel([
         Animated.timing(fadeAnimation, {
@@ -97,7 +117,7 @@ const ProfileScreen = () => {
       ]).start();
     } catch (error) {
       console.error(
-        "Error loading profile:",
+        "Failed to load profile:",
         error,
       );
     } finally {
@@ -124,18 +144,34 @@ const ProfileScreen = () => {
   };
 
   const logout = async () => {
-    setLoggingOut(true);
+    try {
+      setLoggingOut(true);
 
-    const { error } =
-      await supabase.auth.signOut();
+      const { error } =
+        await supabase.auth.signOut();
 
-    setLoggingOut(false);
+      if (error) {
+        Alert.alert(
+          "Logout failed",
+          error.message,
+        );
+        return;
+      }
+    await clearOnboardingData();
 
-    if (error) {
+      navigation.replace("Welcome");
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error,
+      );
+
       Alert.alert(
         "Logout failed",
-        error.message,
+        "Something went wrong. Please try again.",
       );
+    } finally {
+      setLoggingOut(false);
     }
   };
 
@@ -153,6 +189,8 @@ const ProfileScreen = () => {
   const username =
     profile?.username?.trim() ||
     "Knowledge Explorer";
+
+  const email = profile?.email ?? "";
 
   const avatarLetter = username
     .charAt(0)
@@ -178,17 +216,14 @@ const ProfileScreen = () => {
         ]}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <FontText
-                style={styles.avatarText}
-              >
-                {avatarLetter}
-              </FontText>
-            </View>
 
-            <View style={styles.avatarStatus} />
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <FontText
+              style={styles.avatarText}
+            >
+              {avatarLetter}
+            </FontText>
           </View>
 
           <View style={styles.userInfo}>
@@ -215,14 +250,79 @@ const ProfileScreen = () => {
           </View>
         </View>
 
+        {/* Preferences */}
+
+        <View style={styles.section}>
+          <FontText
+            variant="heading2"
+            style={styles.sectionTitle}
+          >
+            Preferences
+          </FontText>
+
+          <View style={styles.settingsCard}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate("SelectCategories", {
+  fromSettings: true,
+})
+              }
+              style={({ pressed }) => [
+                styles.settingRow,
+                pressed &&
+                  styles.settingPressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.settingIcon,
+                  styles.categoryIcon,
+                ]}
+              >
+                <Ionicons
+                  name="options-outline"
+                  size={rw(21)}
+                  color={colors.primary}
+                />
+              </View>
+
+              <View style={styles.settingInfo}>
+                <FontText
+                  variant="bodyMedium"
+                  style={styles.settingTitle}
+                >
+                  Your categories
+                </FontText>
+
+                <FontText
+                  variant="small"
+                  style={styles.settingDescription}
+                >
+                  Change the topics you want to
+                  discover
+                </FontText>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={rw(20)}
+                color={colors.textMuted}
+              />
+            </Pressable>
+          </View>
+        </View>
+
         {/* Logout */}
+
         <Pressable
           onPress={handleLogout}
           disabled={loggingOut}
           style={({ pressed }) => [
             styles.logoutButton,
-            pressed && styles.logoutPressed,
-            loggingOut && styles.logoutDisabled,
+            pressed &&
+              styles.logoutPressed,
+            loggingOut &&
+              styles.logoutDisabled,
           ]}
         >
           {loggingOut ? (
@@ -232,11 +332,11 @@ const ProfileScreen = () => {
             />
           ) : (
             <>
-              <FontText
-                style={styles.logoutIcon}
-              >
-                ↪
-              </FontText>
+              <Ionicons
+                name="log-out-outline"
+                size={rw(21)}
+                color={colors.error}
+              />
 
               <FontText
                 variant="bodyMedium"
@@ -247,7 +347,6 @@ const ProfileScreen = () => {
             </>
           )}
         </Pressable>
-
       </Animated.View>
     </ScrollView>
   );
@@ -276,44 +375,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  /* Header */
-
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: rh(28),
-  },
-
-  avatarContainer: {
-    position: "relative",
-    marginRight: rw(16),
+    marginBottom: rh(34),
   },
 
   avatar: {
-    width: rw(68),
-    height: rw(68),
+    width: rw(72),
+    height: rw(72),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primary,
     borderRadius: rr(24),
+    marginRight: rw(16),
   },
 
   avatarText: {
     fontFamily: "Inter-Bold",
-    fontSize: rf(27),
+    fontSize: rf(28),
     color: colors.white,
-  },
-
-  avatarStatus: {
-    position: "absolute",
-    right: rw(-2),
-    bottom: rw(-2),
-    width: rw(17),
-    height: rw(17),
-    backgroundColor: colors.secondary,
-    borderWidth: rw(3),
-    borderColor: colors.background,
-    borderRadius: rr(10),
   },
 
   userInfo: {
@@ -336,184 +417,32 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 
-  /* Stats */
-
-  statsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: rh(18),
-    backgroundColor: colors.surface,
-    borderRadius: rr(24),
-    marginBottom: rh(30),
-  },
-
-  stat: {
-    flex: 1,
-    alignItems: "center",
-  },
-
-  statIconBlue: {
-    width: rw(30),
-    height: rw(30),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#EAF5FF",
-    borderRadius: rr(10),
-    marginBottom: spacing.xs,
-  },
-
-  statIconTurquoise: {
-    width: rw(30),
-    height: rw(30),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E6F8F7",
-    borderRadius: rr(10),
-    marginBottom: spacing.xs,
-  },
-
-  statIconYellow: {
-    width: rw(30),
-    height: rw(30),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFF8E8",
-    borderRadius: rr(10),
-    marginBottom: spacing.xs,
-  },
-
-  statIconText: {
-    fontFamily: "Inter-Bold",
-    fontSize: rf(14),
-    color: colors.text,
-  },
-
-  statNumber: {
-    fontSize: rf(21),
-    lineHeight: rf(26),
-    color: colors.text,
-  },
-
-  statLabel: {
-    color: colors.textSecondary,
-    marginTop: rh(2),
-  },
-
-  statDivider: {
-    width: 1,
-    height: rh(58),
-    backgroundColor: colors.border,
-  },
-
-  /* Sections */
-
   section: {
-    marginBottom: rh(30),
-  },
-
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginBottom: spacing.md,
-  },
-
-  sectionEyebrow: {
-    fontSize: rf(10),
-    letterSpacing: 1.1,
-    color: colors.primary,
-    marginBottom: spacing.xs,
+    marginBottom: rh(28),
   },
 
   sectionTitle: {
     color: colors.text,
+    marginBottom: rh(14),
   },
-
-  progressPercent: {
-    color: colors.primary,
-    marginBottom: rh(2),
-  },
-
-  /* Progress */
-
-  progressCard: {
-    padding: rw(20),
-    backgroundColor: colors.primary,
-    borderRadius: rr(24),
-  },
-
-  progressTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  progressIconContainer: {
-    width: rw(52),
-    height: rw(52),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.white,
-    borderRadius: rr(17),
-    marginRight: rw(14),
-  },
-
-  progressIcon: {
-    fontSize: rf(26),
-  },
-
-  progressInfo: {
-    flex: 1,
-  },
-
-  progressTitle: {
-    color: colors.white,
-  },
-
-  progressText: {
-    color: "rgba(255,255,255,0.82)",
-    marginTop: spacing.xs,
-  },
-
-  progressTrack: {
-    height: rh(7),
-    overflow: "hidden",
-    backgroundColor:
-      "rgba(255,255,255,0.2)",
-    borderRadius: rr(10),
-    marginTop: rh(22),
-  },
-
-  progressFill: {
-    width: "0%",
-    height: "100%",
-    backgroundColor: colors.white,
-    borderRadius: rr(10),
-  },
-
-  progressHint: {
-    color: "rgba(255,255,255,0.65)",
-    marginTop: spacing.sm,
-  },
-
-  /* Settings */
 
   settingsCard: {
     backgroundColor: colors.surface,
-    borderRadius: rr(22),
+    borderRadius: rr(20),
     overflow: "hidden",
   },
 
   settingRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: rw(15),
+    padding: rw(16),
   },
 
   settingPressed: {
     opacity: 0.65,
   },
 
-  settingIconContainer: {
+  settingIcon: {
     width: rw(44),
     height: rw(44),
     alignItems: "center",
@@ -522,46 +451,22 @@ const styles = StyleSheet.create({
     marginRight: rw(13),
   },
 
-  notificationIcon: {
+  categoryIcon: {
     backgroundColor: "#EAF5FF",
-  },
-
-  aboutIcon: {
-    backgroundColor: "#E6F8F7",
-  },
-
-  settingIcon: {
-    fontSize: rf(20),
   },
 
   settingInfo: {
     flex: 1,
   },
 
-  settingText: {
+  settingTitle: {
     color: colors.text,
   },
 
   settingDescription: {
-    fontFamily: "Inter-Regular",
     color: colors.textSecondary,
-    marginTop: rh(2),
+    marginTop: rh(3),
   },
-
-  arrow: {
-    fontSize: rf(20),
-    fontFamily: "Inter-SemiBold",
-    color: colors.primary,
-    marginLeft: rw(8),
-  },
-
-  rowDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginLeft: rw(72),
-  },
-
-  /* Logout */
 
   logoutButton: {
     height: rh(52),
@@ -582,22 +487,9 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 
-  logoutIcon: {
-    fontSize: rf(19),
-    fontFamily: "Inter-SemiBold",
-    color: colors.error,
-    marginRight: rw(8),
-  },
-
   logoutText: {
     color: colors.error,
-  },
-
-  version: {
-    fontFamily: "Inter-Regular",
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: rh(20),
+    marginLeft: rw(8),
   },
 });
 

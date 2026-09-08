@@ -1,306 +1,1096 @@
 import React, {
-  useEffect,
-  useRef,
+  useCallback,
   useState,
 } from "react";
 
 import {
   ActivityIndicator,
-  Animated,
   FlatList,
   Pressable,
+  RefreshControl,
+  Share,
   StyleSheet,
   View,
 } from "react-native";
 
+import {
+  useFocusEffect,
+} from "@react-navigation/native";
+
+import Ionicons from "@react-native-vector-icons/ionicons";
+
 import FontText from "../../components/common/FontText";
+
 import { colors } from "../../constant/colors";
-import { spacing } from "../../constant/spacing";
-import { rh, rr, rw } from "../../constant/responsive";
-import { getCategories } from "../../services/categoryService";
+
+import {
+  rh,
+  rw,
+  rr,
+  rf,
+} from "../../constant/responsive";
+
+import { supabase } from "../../lib/supabase";
+
+import {
+  getFactInteractions,
+  likeFact,
+  unlikeFact,
+  saveFact,
+  unsaveFact,
+} from "../../services/factInteractionService";
+
 
 type Category = {
   id: string;
   name: string;
-  icon: string;
+  slug: string;
+  icon: string | null;
 };
 
-type CategoryCardProps = {
-  category: Category;
-  index: number;
+
+type Fact = {
+  id: string;
+  title: string;
+  content: string;
+  image_url: string | null;
+  source: string | null;
+  created_at: string;
+
+  categories:
+    | {
+        id: string;
+        name: string;
+      }
+    | null;
 };
 
-const CategoryCard = ({
-  category,
-  index,
-}: CategoryCardProps) => {
-  const scale = useRef(
-    new Animated.Value(1),
-  ).current;
-
-  const iconBackgrounds = [
-    "#EAF5FF",
-    "#E6F8F7",
-    "#FFF8E8",
-  ];
-
-  const handlePressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.97,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  return (
-    <Animated.View
-      style={[
-        styles.cardWrapper,
-        {
-          transform: [{ scale }],
-        },
-      ]}
-    >
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.card}
-      >
-        <View
-          style={[
-            styles.iconContainer,
-            {
-              backgroundColor:
-                iconBackgrounds[index % 3],
-            },
-          ]}
-        >
-          <FontText style={styles.icon}>
-            {category.icon}
-          </FontText>
-        </View>
-
-        <View style={styles.cardContent}>
-          <FontText variant="heading3">
-            {category.name}
-          </FontText>
-
-          <FontText
-            variant="small"
-            style={styles.count}
-          >
-            Explore topics
-          </FontText>
-        </View>
-
-        <View style={styles.arrowContainer}>
-          <FontText style={styles.arrow}>
-            →
-          </FontText>
-        </View>
-      </Pressable>
-    </Animated.View>
-  );
-};
 
 const CategoryScreen = () => {
+
   const [categories, setCategories] =
     useState<Category[]>([]);
+
+  const [selectedCategory, setSelectedCategory] =
+    useState("mix");
+
+  const [facts, setFacts] =
+    useState<Fact[]>([]);
+
+  const [likedFacts, setLikedFacts] =
+    useState<string[]>([]);
+
+  const [savedFacts, setSavedFacts] =
+    useState<string[]>([]);
 
   const [loading, setLoading] =
     useState(true);
 
-  const fade = useRef(
-    new Animated.Value(0),
-  ).current;
+  const [refreshing, setRefreshing] =
+    useState(false);
 
-  const slide = useRef(
-    new Animated.Value(20),
-  ).current;
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slide, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  // ============================================
+  // LOAD CATEGORIES
+  // ============================================
 
-    const loadCategories = async () => {
-      try {
-        const data = await getCategories();
-        setCategories(data);
-      } catch (error) {
-        console.error(
-          "Failed to load categories:",
-          error,
+  const loadCategories = async () => {
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("categories")
+      .select(`
+        id,
+        name,
+        slug,
+        icon
+      `)
+      .order("name", {
+        ascending: true,
+      });
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    setCategories(
+      data ?? [],
+    );
+
+  };
+
+
+  // ============================================
+  // LOAD FACTS
+  // ============================================
+
+  const loadFacts = async (
+    categoryId?: string,
+  ) => {
+
+    let query = supabase
+      .from("facts")
+      .select(`
+        id,
+        title,
+        content,
+        image_url,
+        source,
+        created_at,
+        categories (
+          id,
+          name
+        )
+      `)
+      .order("created_at", {
+        ascending: false,
+      });
+
+
+    // Specific category
+
+    if (categoryId) {
+
+      query = query.eq(
+        "category_id",
+        categoryId,
+      );
+
+    }
+
+
+    const {
+      data,
+      error,
+    } = await query;
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    setFacts(
+      (data as Fact[]) ?? [],
+    );
+
+  };
+
+
+  // ============================================
+  // LOAD EVERYTHING
+  // ============================================
+
+  const loadExplore = async () => {
+
+    try {
+
+      setLoading(true);
+
+
+      await loadCategories();
+
+
+      if (
+        selectedCategory === "mix"
+      ) {
+
+        await loadFacts();
+
+      } else {
+
+        await loadFacts(
+          selectedCategory,
         );
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    loadCategories();
-  }, [fade, slide]);
+      }
+
+
+      const interactions =
+        await getFactInteractions();
+
+
+      setLikedFacts(
+        interactions.likedFactIds,
+      );
+
+      setSavedFacts(
+        interactions.savedFactIds,
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to load Explore:",
+        error,
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+
+  // ============================================
+  // LOAD WHEN SCREEN OPENS
+  // ============================================
+
+  useFocusEffect(
+    useCallback(() => {
+
+      loadExplore();
+
+    }, [selectedCategory]),
+  );
+
+
+  // ============================================
+  // CATEGORY SELECT
+  // ============================================
+
+  const handleCategorySelect = (
+    categoryId: string,
+  ) => {
+
+    if (
+      categoryId ===
+      selectedCategory
+    ) {
+      return;
+    }
+
+
+    setSelectedCategory(
+      categoryId,
+    );
+
+  };
+
+
+  // ============================================
+  // REFRESH
+  // ============================================
+
+  const handleRefresh = async () => {
+
+    try {
+
+      setRefreshing(true);
+
+      await loadExplore();
+
+    } finally {
+
+      setRefreshing(false);
+
+    }
+
+  };
+
+
+  // ============================================
+  // LIKE
+  // ============================================
+
+  const toggleLike = async (
+    factId: string,
+  ) => {
+
+    const isLiked =
+      likedFacts.includes(
+        factId,
+      );
+
+
+    setLikedFacts(
+      previous => {
+
+        if (isLiked) {
+
+          return previous.filter(
+            id => id !== factId,
+          );
+
+        }
+
+        return [
+          ...previous,
+          factId,
+        ];
+
+      },
+    );
+
+
+    try {
+
+      if (isLiked) {
+
+        await unlikeFact(
+          factId,
+        );
+
+      } else {
+
+        await likeFact(
+          factId,
+        );
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Failed to update like:",
+        error,
+      );
+
+
+      // Rollback
+
+      setLikedFacts(
+        previous => {
+
+          if (isLiked) {
+
+            return [
+              ...previous,
+              factId,
+            ];
+
+          }
+
+          return previous.filter(
+            id => id !== factId,
+          );
+
+        },
+      );
+
+    }
+
+  };
+
+
+  // ============================================
+  // SAVE
+  // ============================================
+
+  const toggleSave = async (
+    factId: string,
+  ) => {
+
+    const isSaved =
+      savedFacts.includes(
+        factId,
+      );
+
+
+    setSavedFacts(
+      previous => {
+
+        if (isSaved) {
+
+          return previous.filter(
+            id => id !== factId,
+          );
+
+        }
+
+        return [
+          ...previous,
+          factId,
+        ];
+
+      },
+    );
+
+
+    try {
+
+      if (isSaved) {
+
+        await unsaveFact(
+          factId,
+        );
+
+      } else {
+
+        await saveFact(
+          factId,
+        );
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Failed to update save:",
+        error,
+      );
+
+
+      // Rollback
+
+      setSavedFacts(
+        previous => {
+
+          if (isSaved) {
+
+            return [
+              ...previous,
+              factId,
+            ];
+
+          }
+
+          return previous.filter(
+            id => id !== factId,
+          );
+
+        },
+      );
+
+    }
+
+  };
+
+
+  // ============================================
+  // SHARE
+  // ============================================
+
+  const shareFact = async (
+    fact: Fact,
+  ) => {
+
+    try {
+
+      await Share.share({
+        message: fact.content,
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Share error:",
+        error,
+      );
+
+    }
+
+  };
+
+
+  // ============================================
+  // FACT CARD
+  // ============================================
+
+  const renderFact = ({
+    item,
+  }: {
+    item: Fact;
+  }) => {
+
+    const isLiked =
+      likedFacts.includes(
+        item.id,
+      );
+
+    const isSaved =
+      savedFacts.includes(
+        item.id,
+      );
+
+
+    return (
+
+      <View
+        style={styles.factCard}
+      >
+
+        {/* CATEGORY */}
+
+        {item.categories?.name && (
+
+          <View
+            style={
+              styles.categoryBadge
+            }
+          >
+
+            <FontText
+              variant="small"
+              style={
+                styles.categoryText
+              }
+            >
+              {item.categories.name}
+            </FontText>
+
+          </View>
+
+        )}
+
+
+        {/* TITLE */}
+
+        <FontText
+          variant="heading2"
+          style={styles.title}
+        >
+          {item.title}
+        </FontText>
+
+
+        {/* CONTENT */}
+
+        <FontText
+          variant="body"
+          style={styles.content}
+          numberOfLines={4}
+        >
+          {item.content}
+        </FontText>
+
+
+        {/* SOURCE */}
+
+        {item.source && (
+
+          <FontText
+            variant="small"
+            style={styles.source}
+          >
+            Source: {item.source}
+          </FontText>
+
+        )}
+
+
+        {/* ACTIONS */}
+
+        <View
+          style={styles.actions}
+        >
+
+          {/* LIKE */}
+
+          <Pressable
+            onPress={() =>
+              toggleLike(item.id)
+            }
+            style={
+              styles.actionButton
+            }
+          >
+
+            <Ionicons
+              name={
+                isLiked
+                  ? "heart"
+                  : "heart-outline"
+              }
+              size={rw(22)}
+              color={
+                isLiked
+                  ? colors.error
+                  : colors.text
+              }
+            />
+
+            <FontText
+              variant="small"
+              style={
+                styles.actionText
+              }
+            >
+              Like
+            </FontText>
+
+          </Pressable>
+
+
+          {/* SAVE */}
+
+          <Pressable
+            onPress={() =>
+              toggleSave(item.id)
+            }
+            style={
+              styles.actionButton
+            }
+          >
+
+            <Ionicons
+              name={
+                isSaved
+                  ? "bookmark"
+                  : "bookmark-outline"
+              }
+              size={rw(22)}
+              color={
+                isSaved
+                  ? colors.primary
+                  : colors.text
+              }
+            />
+
+            <FontText
+              variant="small"
+              style={
+                styles.actionText
+              }
+            >
+              Save
+            </FontText>
+
+          </Pressable>
+
+
+          {/* SHARE */}
+
+          <Pressable
+            onPress={() =>
+              shareFact(item)
+            }
+            style={
+              styles.actionButton
+            }
+          >
+
+            <Ionicons
+              name="share-outline"
+              size={rw(22)}
+              color={
+                colors.text
+              }
+            />
+
+            <FontText
+              variant="small"
+              style={
+                styles.actionText
+              }
+            >
+              Share
+            </FontText>
+
+          </Pressable>
+
+        </View>
+
+      </View>
+
+    );
+
+  };
+
+
+  // ============================================
+  // LOADING
+  // ============================================
 
   if (loading) {
+
     return (
-      <View style={styles.center}>
+
+      <View
+        style={
+          styles.loadingContainer
+        }
+      >
+
         <ActivityIndicator
-          size="small"
-          color={colors.primary}
+          size="large"
+          color={
+            colors.primary
+          }
         />
+
       </View>
+
     );
+
   }
 
+
+  // ============================================
+  // SCREEN
+  // ============================================
+
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          opacity: fade,
-          transform: [
-            {
-              translateY: slide,
-            },
-          ],
-        },
-      ]}
+
+    <View
+      style={styles.container}
     >
-      <FontText
-        variant="caption"
-        style={styles.eyebrow}
-      >
-        KNOWLEDGE UNIVERSE
-      </FontText>
 
-      <FontText
-        variant="heading1"
-        style={styles.title}
-      >
-        Explore
-      </FontText>
+      {/* HEADER */}
 
-      <FontText
-        variant="body"
-        style={styles.subtitle}
+      <View
+        style={styles.header}
       >
-        Choose a world of knowledge to discover.
-      </FontText>
+
+        <FontText
+          variant="heading1"
+          style={styles.headerTitle}
+        >
+          Explore
+        </FontText>
+
+      </View>
+
+
+      {/* CATEGORY TABS */}
 
       <FlatList
-        data={categories}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <CategoryCard
-            category={item}
-            index={index}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={
-          styles.listContent
+        horizontal
+        data={[
+          {
+            id: "mix",
+            name: "Mix",
+            slug: "mix",
+            icon: null,
+          },
+          ...categories,
+        ]}
+        keyExtractor={item =>
+          item.id
         }
+        showsHorizontalScrollIndicator={
+          false
+        }
+        contentContainerStyle={
+          styles.tabsContent
+        }
+        renderItem={({
+          item,
+        }) => {
+
+          const isSelected =
+            selectedCategory ===
+            item.id;
+
+
+          return (
+
+            <Pressable
+              onPress={() =>
+                handleCategorySelect(
+                  item.id,
+                )
+              }
+              style={[
+                styles.tab,
+                isSelected &&
+                  styles.selectedTab,
+              ]}
+            >
+
+              {item.icon && (
+
+                <FontText
+                  variant="body"
+                  style={
+                    styles.tabIcon
+                  }
+                >
+                  {item.icon}
+                </FontText>
+
+              )}
+
+              <FontText
+                variant="small"
+                style={[
+                  styles.tabText,
+                  isSelected &&
+                    styles.selectedTabText,
+                ]}
+              >
+                {item.name}
+              </FontText>
+
+            </Pressable>
+
+          );
+
+        }}
       />
-    </Animated.View>
+
+
+      {/* FACTS */}
+
+      {facts.length === 0 ? (
+
+        <View
+          style={
+            styles.emptyContainer
+          }
+        >
+
+          <Ionicons
+            name="bulb-outline"
+            size={rw(45)}
+            color={
+              colors.textMuted
+            }
+          />
+
+          <FontText
+            variant="heading2"
+            style={
+              styles.emptyTitle
+            }
+          >
+            No facts found
+          </FontText>
+
+          <FontText
+            variant="body"
+            style={
+              styles.emptyText
+            }
+          >
+            There are no facts in
+            this category yet.
+          </FontText>
+
+        </View>
+
+      ) : (
+
+        <FlatList
+          data={facts}
+          keyExtractor={item =>
+            item.id
+          }
+          renderItem={
+            renderFact
+          }
+          showsVerticalScrollIndicator={
+            false
+          }
+          contentContainerStyle={
+            styles.listContent
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={
+                refreshing
+              }
+              onRefresh={
+                handleRefresh
+              }
+              tintColor={
+                colors.primary
+              }
+            />
+          }
+        />
+
+      )}
+
+    </View>
+
   );
+
 };
 
+
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.background,
-  },
 
   container: {
     flex: 1,
+    backgroundColor:
+      colors.background,
+  },
+
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      colors.background,
+  },
+
+
+  header: {
     paddingHorizontal: rw(20),
-    paddingTop: rh(24),
-    backgroundColor: colors.background,
+    paddingTop: rh(20),
+    paddingBottom: rh(8),
   },
 
-  eyebrow: {
-    color: colors.primary,
-    letterSpacing: 1.2,
+
+  headerTitle: {
+    color: colors.text,
   },
 
-  title: {
-    marginTop: spacing.xs,
+
+  tabsContent: {
+    paddingHorizontal: rw(16),
+    paddingVertical: rh(10),
+    gap: rw(8),
   },
 
-  subtitle: {
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
 
-  listContent: {
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xxxl,
-  },
-
-  cardWrapper: {
-    marginBottom: spacing.md,
-  },
-
-  card: {
-    minHeight: rh(90),
-    padding: spacing.lg,
-    borderRadius: rr(22),
-    backgroundColor: colors.surface,
+  tab: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: rw(15),
+    paddingVertical: rh(9),
+    borderRadius: rr(22),
+    backgroundColor:
+      colors.white,
+    borderWidth: 1,
+    borderColor:
+      colors.border,
   },
 
-  iconContainer: {
-    width: rw(58),
-    height: rw(58),
+
+  selectedTab: {
+    backgroundColor:
+      colors.primary,
+    borderColor:
+      colors.primary,
+  },
+
+
+  tabIcon: {
+    marginRight: rw(5),
+  },
+
+
+  tabText: {
+    color:
+      colors.textSecondary,
+    fontFamily:
+      "Inter-SemiBold",
+  },
+
+
+  selectedTabText: {
+    color: colors.white,
+  },
+
+
+  listContent: {
+    paddingHorizontal: rw(16),
+    paddingTop: rh(8),
+    paddingBottom: rh(30),
+  },
+
+
+  factCard: {
+    backgroundColor:
+      colors.white,
     borderRadius: rr(18),
+    padding: rw(18),
+    marginBottom: rh(14),
+    borderWidth: 1,
+    borderColor:
+      colors.border,
+  },
+
+
+  categoryBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: rw(10),
+    paddingVertical: rh(5),
+    backgroundColor:
+      "#EAF5FF",
+    borderRadius: rr(20),
+    marginBottom: rh(12),
+  },
+
+
+  categoryText: {
+    color:
+      colors.primary,
+    fontFamily:
+      "Inter-SemiBold",
+  },
+
+
+  title: {
+    color: colors.text,
+    marginBottom: rh(9),
+  },
+
+
+  content: {
+    color:
+      colors.textSecondary,
+    lineHeight: rf(23),
+  },
+
+
+  source: {
+    color:
+      colors.textMuted,
+    marginTop: rh(10),
+  },
+
+
+  actions: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
+    gap: rw(20),
+    marginTop: rh(16),
+    paddingTop: rh(12),
+    borderTopWidth: 1,
+    borderTopColor:
+      colors.border,
+  },
+
+
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: rw(5),
+    minWidth: rw(65),
     justifyContent: "center",
-    marginRight: spacing.lg,
   },
 
-  icon: {
-    fontSize: rw(26),
+
+  actionText: {
+    color:
+      colors.textSecondary,
+    fontSize: rf(12),
   },
 
-  cardContent: {
+
+  emptyContainer: {
     flex: 1,
-  },
-
-  count: {
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-  },
-
-  arrowContainer: {
-    width: rw(42),
-    height: rw(42),
-    borderRadius: rr(14),
-    backgroundColor: colors.white,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: rw(40),
   },
 
-  arrow: {
-    color: colors.primary,
-    fontSize: rw(20),
+
+  emptyTitle: {
+    color: colors.text,
+    marginTop: rh(15),
   },
+
+
+  emptyText: {
+    color:
+      colors.textSecondary,
+    textAlign: "center",
+    marginTop: rh(8),
+  },
+
 });
+
 
 export default CategoryScreen;
