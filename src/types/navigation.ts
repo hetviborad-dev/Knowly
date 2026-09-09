@@ -6,6 +6,7 @@ export type RootStackParamList = {
   SelectCategories: {
     fromSettings?: boolean;
   };
+  NotificationSettings: undefined;
 
   Auth: undefined;
   Notifications: undefined;

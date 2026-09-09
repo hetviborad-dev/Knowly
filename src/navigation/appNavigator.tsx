@@ -9,7 +9,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from '@react-native-vector-icons/ionicons';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import NotificationSettingsScreen from '../screens/NotificationSettings/NotificationSettingsScreen';
 import SplashScreen from '../screens/Splash/SplashScreen';
 import WelcomeScreen from '../screens/Welcome/WelcomeScreen';
 import AskNameScreen from '../screens/AskName/AskNameScreen';
@@ -118,7 +118,10 @@ const AppNavigator = () => {
           name="SelectCategories"
           component={SelectCategoriesScreen}
         />
-
+<Stack.Screen
+  name="NotificationSettings"
+  component={NotificationSettingsScreen}
+/>
         <Stack.Screen name="Auth" component={AuthScreen} />
 
         <Stack.Screen name="Notifications" component={NotificationsScreen} />

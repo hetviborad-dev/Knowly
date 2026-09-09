@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -21,6 +22,10 @@ import type {
 } from "@react-navigation/native-stack";
 
 import {
+  useFocusEffect,
+} from "@react-navigation/native";
+
+import {
   clearOnboardingData,
 } from "../../services/storageService";
 
@@ -33,10 +38,6 @@ import FontText from "../../components/common/FontText";
 import {
   colors,
 } from "../../constant/colors";
-
-import {
-  spacing,
-} from "../../constant/spacing";
 
 import {
   rf,
@@ -64,6 +65,13 @@ type Profile = {
   email: string | null;
 };
 
+type NotificationPreferences = {
+  notifications_enabled: boolean;
+  morning: boolean;
+  afternoon: boolean;
+  evening: boolean;
+};
+
 
 const ProfileScreen = ({
   navigation,
@@ -72,6 +80,13 @@ const ProfileScreen = ({
     profile,
     setProfile,
   ] = useState<Profile | null>(
+    null,
+  );
+
+  const [
+    notificationPreferences,
+    setNotificationPreferences,
+  ] = useState<NotificationPreferences | null>(
     null,
   );
 
@@ -101,8 +116,34 @@ const ProfileScreen = ({
   }, []);
 
 
+  /*
+   * Reload notification settings
+   * every time Profile becomes active.
+   *
+   * This means:
+   *
+   * Profile
+   * ↓
+   * Daily facts
+   * ↓
+   * Save
+   * ↓
+   * Profile
+   *
+   * The summary will immediately update.
+   */
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNotificationPreferences();
+    }, []),
+  );
+
+
   const loadProfile = async () => {
     try {
+      setLoading(true);
+
       const {
         data: {
           user,
@@ -149,6 +190,8 @@ const ProfileScreen = ({
           "",
       });
 
+      await loadNotificationPreferences();
+
       Animated.parallel([
         Animated.timing(
           fadeAnimation,
@@ -178,6 +221,7 @@ const ProfileScreen = ({
       setProfile({
         username:
           "Knowledge Explorer",
+
         email: "",
       });
 
@@ -194,6 +238,112 @@ const ProfileScreen = ({
       setLoading(false);
     }
   };
+
+
+  const loadNotificationPreferences =
+    async () => {
+      try {
+        const {
+          data: {
+            user,
+          },
+        } =
+          await supabase.auth.getUser();
+
+        if (!user) {
+          return;
+        }
+
+        const {
+          data,
+          error,
+        } = await supabase
+          .from("notification_preferences")
+          .select(
+            "notifications_enabled, morning, afternoon, evening",
+          )
+          .eq(
+            "user_id",
+            user.id,
+          )
+          .maybeSingle();
+
+        if (error) {
+          console.error(
+            "Failed to load notification preferences:",
+            error,
+          );
+
+          return;
+        }
+
+        if (!data) {
+          setNotificationPreferences(
+            null,
+          );
+
+          return;
+        }
+
+        setNotificationPreferences({
+          notifications_enabled:
+            data.notifications_enabled,
+
+          morning:
+            data.morning,
+
+          afternoon:
+            data.afternoon,
+
+          evening:
+            data.evening,
+        });
+
+      } catch (error) {
+        console.error(
+          "Notification preferences error:",
+          error,
+        );
+      }
+    };
+
+
+  const getNotificationSummary =
+    () => {
+      if (
+        !notificationPreferences ||
+        !notificationPreferences
+          .notifications_enabled
+      ) {
+        return "Notifications off";
+      }
+
+      const times: string[] = [];
+
+      if (
+        notificationPreferences.morning
+      ) {
+        times.push("Morning");
+      }
+
+      if (
+        notificationPreferences.afternoon
+      ) {
+        times.push("Afternoon");
+      }
+
+      if (
+        notificationPreferences.evening
+      ) {
+        times.push("Evening");
+      }
+
+      if (times.length === 0) {
+        return "Notifications off";
+      }
+
+      return times.join(" · ");
+    };
 
 
   const handleLogout = () => {
@@ -299,6 +449,9 @@ const ProfileScreen = ({
     username
       .charAt(0)
       .toUpperCase();
+
+  const notificationSummary =
+    getNotificationSummary();
 
 
   return (
@@ -554,6 +707,11 @@ const ProfileScreen = ({
             {/* NOTIFICATIONS */}
 
             <Pressable
+              onPress={() =>
+                navigation.navigate(
+                  "NotificationSettings",
+                )
+              }
               style={({
                 pressed,
               }) => [
@@ -596,24 +754,24 @@ const ProfileScreen = ({
                   style={
                     styles.settingDescription
                   }
+                  numberOfLines={1}
                 >
-                  Manage your fact reminders
+                  {notificationSummary}
                 </FontText>
               </View>
 
               <View
                 style={
-                  styles.comingSoonBadge
+                  styles.chevronContainer
                 }
               >
-                <FontText
-                  variant="caption"
-                  style={
-                    styles.comingSoonText
+                <Ionicons
+                  name="chevron-forward"
+                  size={rw(18)}
+                  color={
+                    colors.textMuted
                   }
-                >
-                  SOON
-                </FontText>
+                />
               </View>
             </Pressable>
 
@@ -1146,24 +1304,6 @@ const styles = StyleSheet.create({
       "#F0F1F3",
     marginLeft:
       rw(72),
-  },
-
-  comingSoonBadge: {
-    paddingHorizontal:
-      rw(8),
-    paddingVertical:
-      rh(4),
-    borderRadius:
-      rr(7),
-    backgroundColor:
-      "#F3F4F6",
-  },
-
-  comingSoonText: {
-    fontSize: rf(8),
-    letterSpacing: 0.7,
-    color:
-      colors.textMuted,
   },
 
   languageValue: {

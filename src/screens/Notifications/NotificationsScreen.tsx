@@ -33,7 +33,13 @@ import type {
 } from "../../types/navigation";
 
 import useDisableOnboardingBack from "../../hooks/useDisableOnboardingBack";
-import { saveOnboardingStep } from "../../services/storageService";
+import {
+  saveOnboardingStep,
+} from "../../services/storageService";
+
+import {
+  supabase,
+} from "../../lib/supabase";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -73,6 +79,11 @@ const NotificationsScreen = ({
     "morning",
   ]);
 
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
+
   const toggleTime = (
     id: string,
   ) => {
@@ -109,26 +120,230 @@ const NotificationsScreen = ({
         return;
       }
 
+      try {
+        setLoading(true);
+
+        /*
+         * Get currently logged-in user
+         */
+        const {
+          data: {
+            user,
+          },
+          error: userError,
+        } =
+          await supabase.auth.getUser();
+
+        if (userError) {
+          console.error(
+            "KNOWLY USER ERROR:",
+            userError,
+          );
+
+          Alert.alert(
+            "Something went wrong",
+            "We couldn't verify your account.",
+          );
+
+          return;
+        }
+
+        if (!user) {
+          Alert.alert(
+            "Authentication required",
+            "Please log in before setting notifications.",
+          );
+
+          return;
+        }
+
+        /*
+         * Save notification preferences
+         */
+        const {
+          error,
+        } = await supabase
+          .from(
+            "notification_preferences",
+          )
+          .upsert(
+            {
+              user_id: user.id,
+
+              notifications_enabled:
+                true,
+
+              morning:
+                selectedTimes.includes(
+                  "morning",
+                ),
+
+              afternoon:
+                selectedTimes.includes(
+                  "afternoon",
+                ),
+
+              evening:
+                selectedTimes.includes(
+                  "evening",
+                ),
+
+              updated_at:
+                new Date().toISOString(),
+            },
+            {
+              onConflict:
+                "user_id",
+            },
+          );
+
+        if (error) {
+          console.error(
+            "KNOWLY NOTIFICATION SAVE ERROR:",
+            error,
+          );
+
+          Alert.alert(
+            "Couldn't save settings",
+            "We couldn't save your notification preferences. Please try again.",
+          );
+
+          return;
+        }
+
+        console.log(
+          "KNOWLY NOTIFICATIONS SAVED:",
+          {
+            user_id: user.id,
+            notifications_enabled:
+              true,
+            morning:
+              selectedTimes.includes(
+                "morning",
+              ),
+            afternoon:
+              selectedTimes.includes(
+                "afternoon",
+              ),
+            evening:
+              selectedTimes.includes(
+                "evening",
+              ),
+          },
+        );
+
+        await saveOnboardingStep(
+          "NOTIFICATIONS",
+        );
+
+        navigation.replace(
+          "MainTabs",
+        );
+      } catch (error) {
+        console.error(
+          "KNOWLY NOTIFICATION ERROR:",
+          error,
+        );
+
+        Alert.alert(
+          "Something went wrong",
+          "Please try again.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  const handleSkip = async () => {
+    try {
+      setLoading(true);
+
+      /*
+       * Get currently logged-in user
+       */
+      const {
+        data: {
+          user,
+        },
+      } =
+        await supabase.auth.getUser();
+
+      if (!user) {
+        Alert.alert(
+          "Authentication required",
+          "Please log in before continuing.",
+        );
+
+        return;
+      }
+
+      /*
+       * Save notifications as OFF
+       */
+      const {
+        error,
+      } = await supabase
+        .from(
+          "notification_preferences",
+        )
+        .upsert(
+          {
+            user_id: user.id,
+
+            notifications_enabled:
+              false,
+
+            morning: false,
+            afternoon: false,
+            evening: false,
+
+            updated_at:
+              new Date().toISOString(),
+          },
+          {
+            onConflict:
+              "user_id",
+          },
+        );
+
+      if (error) {
+        console.error(
+          "KNOWLY NOTIFICATION SKIP ERROR:",
+          error,
+        );
+
+        Alert.alert(
+          "Couldn't save settings",
+          "We couldn't save your notification preference. Please try again.",
+        );
+
+        return;
+      }
+
       console.log(
-        "KNOWLY NOTIFICATION TIMES:",
-        selectedTimes,
+        "KNOWLY NOTIFICATIONS: SKIPPED",
       );
-await saveOnboardingStep("NOTIFICATIONS");
+
+      await saveOnboardingStep(
+        "NOTIFICATIONS",
+      );
 
       navigation.replace(
         "MainTabs",
       );
-    };
+    } catch (error) {
+      console.error(
+        "KNOWLY NOTIFICATION SKIP ERROR:",
+        error,
+      );
 
-  const handleSkip = async () => {
-    console.log(
-      "KNOWLY NOTIFICATIONS: SKIPPED",
-    );
-await saveOnboardingStep("NOTIFICATIONS");
-
-    navigation.replace(
-      "MainTabs",
-    );
+      Alert.alert(
+        "Something went wrong",
+        "Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -193,6 +408,7 @@ await saveOnboardingStep("NOTIFICATIONS");
                     item.id,
                   )
                 }
+                disabled={loading}
                 style={[
                   styles.timeCard,
 
@@ -272,6 +488,7 @@ await saveOnboardingStep("NOTIFICATIONS");
 
         <AppButton
           title="Turn on notifications"
+          loading={loading}
           onPress={
             handleContinue
           }
@@ -281,6 +498,7 @@ await saveOnboardingStep("NOTIFICATIONS");
 
         <Pressable
           onPress={handleSkip}
+          disabled={loading}
           style={
             styles.skipButton
           }

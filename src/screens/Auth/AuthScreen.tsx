@@ -36,7 +36,6 @@ import type { RootStackParamList } from "../../types/navigation";
 
 import useDisableOnboardingBack from "../../hooks/useDisableOnboardingBack";
 
-// Logo
 import Logo from "../../assets/svgs/logo.svg";
 
 type Props = NativeStackScreenProps<
@@ -123,7 +122,11 @@ const AuthScreen = ({
     try {
       setLoading(true);
 
+      /*
+       * Sign in
+       */
       const {
+        data,
         error,
       } =
         await supabase.auth.signInWithPassword(
@@ -141,6 +144,79 @@ const AuthScreen = ({
         );
         return;
       }
+
+      /*
+       * Make sure user exists
+       */
+      if (!data.user) {
+        Alert.alert(
+          "Login failed",
+          "We couldn't find your account.",
+        );
+        return;
+      }
+
+      /*
+       * Check whether this user
+       * has already completed
+       * notification setup.
+       */
+      const {
+        data:
+          notificationPreferences,
+        error:
+          notificationError,
+      } =
+        await supabase
+          .from(
+            "notification_preferences",
+          )
+          .select("user_id")
+          .eq(
+            "user_id",
+            data.user.id,
+          )
+          .maybeSingle();
+
+      if (notificationError) {
+        console.error(
+          "KNOWLY NOTIFICATION CHECK ERROR:",
+          notificationError,
+        );
+
+        Alert.alert(
+          "Something went wrong",
+          "We couldn't check your notification settings.",
+        );
+
+        return;
+      }
+
+      /*
+       * New/existing user without
+       * notification preferences
+       */
+      if (
+        !notificationPreferences
+      ) {
+        console.log(
+          "KNOWLY → NOTIFICATIONS",
+        );
+
+        navigation.replace(
+          "Notifications",
+        );
+
+        return;
+      }
+
+      /*
+       * User already completed
+       * notification setup
+       */
+      console.log(
+        "KNOWLY → MAIN TABS",
+      );
 
       navigation.replace(
         "MainTabs",
@@ -276,6 +352,9 @@ const AuthScreen = ({
           "=========================",
         );
 
+        /*
+         * Signup error
+         */
         if (error) {
           Alert.alert(
             "Sign up failed",
@@ -292,6 +371,21 @@ const AuthScreen = ({
             "Signup failed",
             "We couldn't create your account.",
           );
+          return;
+        }
+
+        /*
+         * If email confirmation
+         * is enabled, Supabase may
+         * create the user without
+         * an authenticated session.
+         */
+        if (!data.session) {
+          Alert.alert(
+            "Check your email",
+            "Your account was created. Please confirm your email, then log in to continue.",
+          );
+
           return;
         }
 
@@ -432,9 +526,7 @@ const AuthScreen = ({
       <View
         style={styles.container}
       >
-        {/* =========================
-            BRAND
-        ========================== */}
+        {/* BRAND */}
 
         <View
           style={styles.brand}
@@ -451,9 +543,7 @@ const AuthScreen = ({
           </View>
         </View>
 
-        {/* =========================
-            AUTH HEADER
-        ========================== */}
+        {/* HEADER */}
 
         <View
           style={styles.header}
@@ -479,9 +569,7 @@ const AuthScreen = ({
           </FontText>
         </View>
 
-        {/* =========================
-            FORM
-        ========================== */}
+        {/* FORM */}
 
         <View
           style={styles.form}
@@ -539,8 +627,6 @@ const AuthScreen = ({
             />
           )}
 
-          {/* Forgot password */}
-
           {isLogin && (
             <Pressable
               onPress={
@@ -562,8 +648,6 @@ const AuthScreen = ({
             </Pressable>
           )}
 
-          {/* Submit */}
-
           <AppButton
             title={
               isLogin
@@ -577,9 +661,7 @@ const AuthScreen = ({
           />
         </View>
 
-        {/* =========================
-            BOTTOM SWITCH
-        ========================== */}
+        {/* BOTTOM SWITCH */}
 
         <View
           style={
@@ -617,9 +699,7 @@ const AuthScreen = ({
           </Pressable>
         </View>
 
-        {/* =========================
-            FOOTER
-        ========================== */}
+        {/* FOOTER */}
 
         <View
           style={styles.footer}
@@ -650,10 +730,6 @@ const styles = StyleSheet.create({
     paddingBottom: rh(24),
   },
 
-  /*
-   * BRAND
-   */
-
   brand: {
     alignItems: "center",
     marginBottom: rh(26),
@@ -679,10 +755,6 @@ const styles = StyleSheet.create({
     maxWidth: rw(280),
   },
 
-  /*
-   * HEADER
-   */
-
   header: {
     width: "100%",
     marginBottom: rh(18),
@@ -700,10 +772,6 @@ const styles = StyleSheet.create({
     lineHeight: rh(21),
     maxWidth: rw(330),
   },
-
-  /*
-   * LOGIN / SIGNUP SWITCH
-   */
 
   modeContainer: {
     width: "100%",
@@ -737,10 +805,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  /*
-   * FORM
-   */
-
   form: {
     width: "100%",
   },
@@ -758,10 +822,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /*
-   * BOTTOM ACCOUNT SWITCH
-   */
-
   bottomContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -778,10 +838,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: rw(5),
   },
-
-  /*
-   * FOOTER
-   */
 
   footer: {
     alignItems: "center",
