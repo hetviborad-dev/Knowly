@@ -4,20 +4,29 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+import type {
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
 
 import { supabase } from "../../lib/supabase";
 
-import { RootStackParamList } from "../../types/navigation";
+import type {
+  RootStackParamList,
+} from "../../types/navigation";
+
 import { colors } from "../../constant/colors";
 import { typography } from "../../constant/typography";
+import { getOnboardingStep } from "../../services/storageService";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
   "Splash"
 >;
 
-const SplashScreen = ({ navigation }: Props) => {
+const SplashScreen = ({
+  navigation,
+}: Props) => {
   const opacity = useRef(
     new Animated.Value(0),
   ).current;
@@ -41,38 +50,83 @@ const SplashScreen = ({ navigation }: Props) => {
       }),
     ]).start();
 
-    const checkSession = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+const checkSession = async () => {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-        console.log(
-          "KNOWLY SPLASH SESSION:",
-          session,
-        );
+    console.log(
+      "KNOWLY SPLASH SESSION:",
+      session,
+    );
 
-        if (session) {
-          navigation.replace("MainTabs");
-        } else {
-          navigation.replace("Welcome");
-        }
-      } catch (error) {
-        console.error(
-          "Failed to check session:",
-          error,
-        );
+    // --------------------------------
+    // USER ALREADY LOGGED IN
+    // --------------------------------
 
+    if (session) {
+      navigation.replace("MainTabs");
+      return;
+    }
+
+    // --------------------------------
+    // USER NOT LOGGED IN
+    // RESUME ONBOARDING
+    // --------------------------------
+
+    const onboardingStep =
+      await getOnboardingStep();
+
+    console.log(
+      "KNOWLY ONBOARDING STEP:",
+      onboardingStep,
+    );
+
+    switch (onboardingStep) {
+      case "NAME":
+        navigation.replace("SelectCategories");
+        break;
+
+      case "CATEGORIES":
+        navigation.replace("Auth");
+        break;
+
+      case "AUTH":
+        navigation.replace("Notifications");
+        break;
+
+      case "NOTIFICATIONS":
         navigation.replace("Welcome");
-      }
-    };
+        break;
+
+      case "WELCOME":
+      default:
+        navigation.replace("Welcome");
+        break;
+    }
+  } catch (error) {
+    console.error(
+      "Failed to check session:",
+      error,
+    );
+
+    navigation.replace("Welcome");
+  }
+};
 
     const timer = setTimeout(() => {
       checkSession();
     }, 1500);
 
-    return () => clearTimeout(timer);
-  }, [navigation, opacity, scale]);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    navigation,
+    opacity,
+    scale,
+  ]);
 
   return (
     <View style={styles.container}>
@@ -86,12 +140,16 @@ const SplashScreen = ({ navigation }: Props) => {
         ]}
       >
         <View style={styles.logoCircle}>
-          <Animated.Text style={styles.logoText}>
+          <Animated.Text
+            style={styles.logoText}
+          >
             K
           </Animated.Text>
         </View>
 
-        <Animated.Text style={styles.appName}>
+        <Animated.Text
+          style={styles.appName}
+        >
           Knowly
         </Animated.Text>
       </Animated.View>
@@ -133,6 +191,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "800",
     color: colors.white,
-    fontFamily: typography.heading1.fontFamily,
+    fontFamily:
+      typography.heading1.fontFamily,
   },
 });

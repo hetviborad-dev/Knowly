@@ -1,9 +1,24 @@
+// src/services/storageService.ts
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const STORAGE_KEYS = {
   NAME: "knowly_user_name",
   CATEGORIES: "knowly_selected_categories",
+  ONBOARDING_STEP: "knowly_onboarding_step",
 };
+
+export type OnboardingStep =
+  | "WELCOME"
+  | "NAME"
+  | "CATEGORIES"
+  | "AUTH"
+  | "NOTIFICATIONS";
+
+
+// -----------------------------
+// NAME
+// -----------------------------
 
 export const saveUserName = async (name: string) => {
   await AsyncStorage.setItem(
@@ -17,6 +32,11 @@ export const getUserName = async () => {
     STORAGE_KEYS.NAME,
   );
 };
+
+
+// -----------------------------
+// CATEGORIES
+// -----------------------------
 
 export const saveSelectedCategories = async (
   categories: string[],
@@ -45,6 +65,44 @@ export const getSelectedCategories =
     }
   };
 
+
+// -----------------------------
+// ONBOARDING STEP
+// -----------------------------
+
+export const saveOnboardingStep = async (
+  step: OnboardingStep,
+) => {
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.ONBOARDING_STEP,
+    step,
+  );
+};
+
+export const getOnboardingStep =
+  async (): Promise<OnboardingStep> => {
+    const step =
+      await AsyncStorage.getItem(
+        STORAGE_KEYS.ONBOARDING_STEP,
+      );
+
+    if (
+      step === "NAME" ||
+      step === "CATEGORIES" ||
+      step === "AUTH" ||
+      step === "NOTIFICATIONS"
+    ) {
+      return step;
+    }
+
+    return "WELCOME";
+  };
+
+
+// -----------------------------
+// CLEAR ON LOGOUT
+// -----------------------------
+
 export const clearOnboardingData =
   async () => {
     await AsyncStorage.removeItem(
@@ -53,5 +111,9 @@ export const clearOnboardingData =
 
     await AsyncStorage.removeItem(
       STORAGE_KEYS.CATEGORIES,
+    );
+
+    await AsyncStorage.removeItem(
+      STORAGE_KEYS.ONBOARDING_STEP,
     );
   };

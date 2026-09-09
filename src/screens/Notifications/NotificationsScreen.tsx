@@ -1,21 +1,39 @@
-import React, { useState } from "react";
+import React, {
+  useState,
+} from "react";
+
 import {
   Alert,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
 import Ionicons from "@react-native-vector-icons/ionicons";
+
+import type {
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
 
 import AnimatedScreen from "../../components/common/AnimatedScreen";
 import AppButton from "../../components/common/AppButton";
 import FontText from "../../components/common/FontText";
 
-import { colors } from "../../constant/colors";
-import { rh, rw } from "../../constant/responsive";
+import {
+  colors,
+} from "../../constant/colors";
 
-import type { RootStackParamList } from "../../types/navigation";
+import {
+  rh,
+  rw,
+} from "../../constant/responsive";
+
+import type {
+  RootStackParamList,
+} from "../../types/navigation";
+
+import useDisableOnboardingBack from "../../hooks/useDisableOnboardingBack";
+import { saveOnboardingStep } from "../../services/storageService";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -46,44 +64,71 @@ const TIMES = [
 const NotificationsScreen = ({
   navigation,
 }: Props) => {
-  const [selectedTimes, setSelectedTimes] =
-    useState<string[]>(["morning"]);
+  useDisableOnboardingBack();
 
-  const toggleTime = (id: string) => {
-    setSelectedTimes((current) => {
-      if (current.includes(id)) {
-        return current.filter(
-          (item) => item !== id,
+  const [
+    selectedTimes,
+    setSelectedTimes,
+  ] = useState<string[]>([
+    "morning",
+  ]);
+
+  const toggleTime = (
+    id: string,
+  ) => {
+    setSelectedTimes(
+      current => {
+        if (
+          current.includes(id)
+        ) {
+          return current.filter(
+            item =>
+              item !== id,
+          );
+        }
+
+        return [
+          ...current,
+          id,
+        ];
+      },
+    );
+  };
+
+  const handleContinue =
+    async () => {
+      if (
+        selectedTimes.length ===
+        0
+      ) {
+        Alert.alert(
+          "Choose a time",
+          "Select at least one time to receive facts.",
         );
+
+        return;
       }
 
-      return [...current, id];
-    });
-  };
-
-  const handleContinue = () => {
-    if (selectedTimes.length === 0) {
-      Alert.alert(
-        "Choose a time",
-        "Select at least one time to receive facts.",
+      console.log(
+        "KNOWLY NOTIFICATION TIMES:",
+        selectedTimes,
       );
-      return;
-    }
+await saveOnboardingStep("NOTIFICATIONS");
 
-    console.log(
-      "KNOWLY NOTIFICATION TIMES:",
-      selectedTimes,
-    );
+      navigation.replace(
+        "MainTabs",
+      );
+    };
 
-    navigation.replace("MainTabs");
-  };
-
-  const handleSkip = () => {
+  const handleSkip = async () => {
     console.log(
       "KNOWLY NOTIFICATIONS: SKIPPED",
     );
+await saveOnboardingStep("NOTIFICATIONS");
 
-    navigation.replace("MainTabs");
+    navigation.replace(
+      "MainTabs",
+    );
   };
 
   return (
@@ -93,7 +138,12 @@ const NotificationsScreen = ({
     >
       <View style={styles.container}>
         {/* Notification icon */}
-        <View style={styles.iconContainer}>
+
+        <View
+          style={
+            styles.iconContainer
+          }
+        >
           <Ionicons
             name="notifications-outline"
             size={rw(34)}
@@ -102,50 +152,66 @@ const NotificationsScreen = ({
         </View>
 
         {/* Title */}
+
         <FontText
           variant="display"
           style={styles.title}
         >
-          Get interesting facts throughout the day
+          Get interesting facts
+          throughout the day
         </FontText>
 
         {/* Description */}
+
         <FontText
           variant="body"
           style={styles.description}
         >
-          Let Knowly send you fascinating facts at
-          the times that work best for you.
+          Let Knowly send you fascinating
+          facts at the times that work
+          best for you.
         </FontText>
 
         {/* Time selection */}
-        <View style={styles.timesContainer}>
-          {TIMES.map((item) => {
+
+        <View
+          style={
+            styles.timesContainer
+          }
+        >
+          {TIMES.map(item => {
             const selected =
-              selectedTimes.includes(item.id);
+              selectedTimes.includes(
+                item.id,
+              );
 
             return (
               <Pressable
                 key={item.id}
                 onPress={() =>
-                  toggleTime(item.id)
+                  toggleTime(
+                    item.id,
+                  )
                 }
                 style={[
                   styles.timeCard,
+
                   selected &&
                     styles.timeCardSelected,
                 ]}
               >
-                {/* Icon */}
                 <View
                   style={[
                     styles.timeIcon,
+
                     selected &&
                       styles.timeIconSelected,
                   ]}
                 >
                   <Ionicons
-                    name={item.icon}
+                    name={
+                      item.icon as any
+                    }
                     size={rw(22)}
                     color={
                       selected
@@ -155,27 +221,34 @@ const NotificationsScreen = ({
                   />
                 </View>
 
-                {/* Text */}
-                <View style={styles.timeContent}>
+                <View
+                  style={
+                    styles.timeContent
+                  }
+                >
                   <FontText
                     variant="body"
-                    style={styles.timeLabel}
+                    style={
+                      styles.timeLabel
+                    }
                   >
                     {item.label}
                   </FontText>
 
                   <FontText
                     variant="caption"
-                    style={styles.timeValue}
+                    style={
+                      styles.timeValue
+                    }
                   >
                     {item.time}
                   </FontText>
                 </View>
 
-                {/* Checkbox */}
                 <View
                   style={[
                     styles.checkbox,
+
                     selected &&
                       styles.checkboxSelected,
                   ]}
@@ -184,7 +257,9 @@ const NotificationsScreen = ({
                     <Ionicons
                       name="checkmark"
                       size={rw(16)}
-                      color={colors.white}
+                      color={
+                        colors.white
+                      }
                     />
                   )}
                 </View>
@@ -194,15 +269,21 @@ const NotificationsScreen = ({
         </View>
 
         {/* Continue */}
+
         <AppButton
           title="Turn on notifications"
-          onPress={handleContinue}
+          onPress={
+            handleContinue
+          }
         />
 
         {/* Skip */}
+
         <Pressable
           onPress={handleSkip}
-          style={styles.skipButton}
+          style={
+            styles.skipButton
+          }
         >
           <FontText
             variant="small"
@@ -215,6 +296,8 @@ const NotificationsScreen = ({
     </AnimatedScreen>
   );
 };
+
+export default NotificationsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -284,7 +367,6 @@ const styles = StyleSheet.create({
   },
 
   timeLabel: {
-    fontFamily: "Inter-SemiBold",
     color: colors.text,
   },
 
@@ -318,5 +400,3 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
-
-export default NotificationsScreen;

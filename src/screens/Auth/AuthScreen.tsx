@@ -1,10 +1,14 @@
-import React, { useState } from "react";
+import React, {
+  useState,
+} from "react";
+
 import {
   Alert,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
+
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import AnimatedScreen from "../../components/common/AnimatedScreen";
@@ -14,53 +18,91 @@ import PasswordInput from "../../components/auth/PasswordInput";
 import FontText from "../../components/common/FontText";
 
 import { supabase } from "../../lib/supabase";
+
 import {
   getSelectedCategories,
   getUserName,
+  saveOnboardingStep,
 } from "../../services/storageService";
 
 import { colors } from "../../constant/colors";
-import { rf, rh, rw } from "../../constant/responsive";
+
+import {
+  rh,
+  rw,
+} from "../../constant/responsive";
 
 import type { RootStackParamList } from "../../types/navigation";
+
+import useDisableOnboardingBack from "../../hooks/useDisableOnboardingBack";
+
+// Logo
+import Logo from "../../assets/svgs/logo.svg";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
   "Auth"
 >;
 
-type AuthMode = "login" | "signup";
+type AuthMode =
+  | "login"
+  | "signup";
 
-const AuthScreen = ({ navigation }: Props) => {
-  const [mode, setMode] = useState<AuthMode>("login");
+const AuthScreen = ({
+  navigation,
+}: Props) => {
+  useDisableOnboardingBack();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] =
+  const [mode, setMode] =
+    useState<AuthMode>("login");
+
+  const [email, setEmail] =
     useState("");
 
-  const [showPassword, setShowPassword] =
+  const [password, setPassword] =
+    useState("");
+
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
+
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
+
+  const [
+    showConfirmPassword,
+    setShowConfirmPassword,
+  ] = useState(false);
+
+  const [loading, setLoading] =
     useState(false);
 
-  const [showConfirmPassword, setShowConfirmPassword] =
-    useState(false);
+  const isLogin =
+    mode === "login";
 
-  const [loading, setLoading] = useState(false);
-
-  const isLogin = mode === "login";
-
+  /*
+   * Switch login / signup
+   */
   const switchMode = () => {
-    setMode(isLogin ? "signup" : "login");
+    setMode(
+      isLogin
+        ? "signup"
+        : "login",
+    );
+
     setPassword("");
     setConfirmPassword("");
+
     setShowPassword(false);
     setShowConfirmPassword(false);
   };
 
-  // ============================================
-  // LOGIN
-  // ============================================
-
+  /*
+   * LOGIN
+   */
   const handleLogin = async () => {
     if (!email.trim()) {
       Alert.alert(
@@ -78,175 +120,252 @@ const AuthScreen = ({ navigation }: Props) => {
       return;
     }
 
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const { error } =
-      await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const {
+        error,
+      } =
+        await supabase.auth.signInWithPassword(
+          {
+            email:
+              email.trim(),
+            password,
+          },
+        );
 
-    setLoading(false);
+      if (error) {
+        Alert.alert(
+          "Login failed",
+          error.message,
+        );
+        return;
+      }
 
-    if (error) {
+      navigation.replace(
+        "MainTabs",
+      );
+    } catch (error) {
+      console.error(
+        "Login error:",
+        error,
+      );
+
       Alert.alert(
         "Login failed",
-        error.message,
+        "Something went wrong. Please try again.",
       );
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    // Existing user → Main App
-    navigation.replace("MainTabs");
   };
 
-  // ============================================
-  // SIGN UP
-  // ============================================
+  /*
+   * SIGN UP
+   */
+  const handleSignUp =
+    async () => {
+      if (!email.trim()) {
+        Alert.alert(
+          "Email required",
+          "Please enter your email.",
+        );
+        return;
+      }
 
-const handleSignUp = async () => {
-  if (!email.trim()) {
-    Alert.alert(
-      "Email required",
-      "Please enter your email.",
-    );
-    return;
-  }
+      if (
+        password.length < 6
+      ) {
+        Alert.alert(
+          "Password too short",
+          "Password must be at least 6 characters.",
+        );
+        return;
+      }
 
-  if (password.length < 6) {
-    Alert.alert(
-      "Password too short",
-      "Password must be at least 6 characters.",
-    );
-    return;
-  }
+      if (
+        password !==
+        confirmPassword
+      ) {
+        Alert.alert(
+          "Passwords don't match",
+          "Please make sure both passwords are the same.",
+        );
+        return;
+      }
 
-  if (password !== confirmPassword) {
-    Alert.alert(
-      "Passwords don't match",
-      "Please make sure both passwords are the same.",
-    );
-    return;
-  }
+      try {
+        setLoading(true);
 
-  setLoading(true);
+        /*
+         * Get onboarding data
+         */
+        const name =
+          await getUserName();
 
-  try {
-    // Get onboarding data saved earlier
-    const name = await getUserName();
-    const selectedCategories =
-      await getSelectedCategories();
+        const selectedCategories =
+          await getSelectedCategories();
 
-    // Make sure onboarding data exists
-    if (!name) {
-      Alert.alert(
-        "Name missing",
-        "Please go back and enter your name.",
-      );
-      return;
-    }
+        /*
+         * Validate name
+         */
+        if (!name) {
+          Alert.alert(
+            "Name missing",
+            "Please go back and enter your name.",
+          );
+          return;
+        }
 
-    if (selectedCategories.length < 2) {
-      Alert.alert(
-        "Categories missing",
-        "Please select at least 2 categories.",
-      );
-      return;
-    }
+        /*
+         * Validate categories
+         */
+        if (
+          selectedCategories.length <
+          2
+        ) {
+          Alert.alert(
+            "Categories missing",
+            "Please select at least 2 categories.",
+          );
+          return;
+        }
 
-    // Create Supabase account
-    const { data, error } =
-      await supabase.auth.signUp({
-        email: email.trim(),
-        password,
+        /*
+         * Create account
+         */
+        const {
+          data,
+          error,
+        } =
+          await supabase.auth.signUp(
+            {
+              email:
+                email.trim(),
+              password,
 
-        options: {
-          data: {
-            username: name,
-          },
-        },
-      });
+              options: {
+                data: {
+                  username:
+                    name,
+                },
+              },
+            },
+          );
 
-    console.log("===== KNOWLY SIGNUP =====");
-    console.log("USER:", data.user);
-    console.log("SESSION:", data.session);
-    console.log("ERROR:", error);
-    console.log("=========================");
+        console.log(
+          "===== KNOWLY SIGNUP =====",
+        );
 
-    if (error) {
-      Alert.alert(
-        "Sign up failed",
-        error.message,
-      );
-      return;
-    }
+        console.log(
+          "USER:",
+          data.user,
+        );
 
-    // Supabase successfully created the account
-    // and returned an active session.
-    if (!data.user || !data.session) {
-      Alert.alert(
-        "Signup failed",
-        "Account was created, but no active session was returned.",
-      );
-      return;
-    }
+        console.log(
+          "SESSION:",
+          data.session,
+        );
 
-    // ============================================
-    // SAVE SELECTED CATEGORIES
-    // ============================================
+        console.log(
+          "ERROR:",
+          error,
+        );
 
-    const categoryRows =
-      selectedCategories.map((categoryId) => ({
-        user_id: data.user.id,
-        category_id: categoryId,
-      }));
+        console.log(
+          "=========================",
+        );
 
-    const { error: categoryError } =
-      await supabase
-        .from("user_categories")
-        .insert(categoryRows);
+        if (error) {
+          Alert.alert(
+            "Sign up failed",
+            error.message,
+          );
+          return;
+        }
 
-    console.log(
-      "KNOWLY CATEGORY ERROR:",
-      categoryError,
-    );
+        /*
+         * User must exist
+         */
+        if (!data.user) {
+          Alert.alert(
+            "Signup failed",
+            "We couldn't create your account.",
+          );
+          return;
+        }
 
-    if (categoryError) {
-      Alert.alert(
-        "Category setup failed",
-        categoryError.message,
-      );
-      return;
-    }
+        /*
+         * Save categories
+         */
+        const categoryRows =
+          selectedCategories.map(
+            categoryId => ({
+              user_id:
+                data.user!.id,
 
-    // ============================================
-    // SUCCESS
-    // ============================================
+              category_id:
+                categoryId,
+            }),
+          );
 
-    console.log(
-      "KNOWLY → NOTIFICATIONS",
-    );
+        const {
+          error:
+            categoryError,
+        } =
+          await supabase
+            .from(
+              "user_categories",
+            )
+            .insert(
+              categoryRows,
+            );
 
-    navigation.replace("Notifications");
-  } catch (error) {
-    console.log(
-      "KNOWLY SIGNUP CATCH ERROR:",
-      error,
-    );
+        console.log(
+          "KNOWLY CATEGORY ERROR:",
+          categoryError,
+        );
 
-    Alert.alert(
-      "Something went wrong",
-      "Please try again.",
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+        if (categoryError) {
+          Alert.alert(
+            "Category setup failed",
+            categoryError.message,
+          );
+          return;
+        }
 
-  // ============================================
-  // SUBMIT
-  // ============================================
+        /*
+         * Save onboarding progress
+         */
+        await saveOnboardingStep(
+          "AUTH",
+        );
 
+        console.log(
+          "KNOWLY → NOTIFICATIONS",
+        );
+
+        navigation.replace(
+          "Notifications",
+        );
+      } catch (error) {
+        console.error(
+          "KNOWLY SIGNUP ERROR:",
+          error,
+        );
+
+        Alert.alert(
+          "Something went wrong",
+          "Please try again.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  /*
+   * SUBMIT
+   */
   const handleSubmit = () => {
     if (isLogin) {
       handleLogin();
@@ -255,190 +374,424 @@ const handleSignUp = async () => {
     }
   };
 
-  // ============================================
-  // FORGOT PASSWORD
-  // ============================================
+  /*
+   * FORGOT PASSWORD
+   */
+  const handleForgotPassword =
+    async () => {
+      if (!email.trim()) {
+        Alert.alert(
+          "Enter your email",
+          "Enter your email first so we know where to send the reset link.",
+        );
+        return;
+      }
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert(
-        "Enter your email",
-        "Enter your email first so we know where to send the reset link.",
-      );
-      return;
-    }
+      try {
+        setLoading(true);
 
-    setLoading(true);
+        const {
+          error,
+        } =
+          await supabase.auth.resetPasswordForEmail(
+            email.trim(),
+          );
 
-    const { error } =
-      await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-      );
+        if (error) {
+          Alert.alert(
+            "Something went wrong",
+            error.message,
+          );
+          return;
+        }
 
-    setLoading(false);
+        Alert.alert(
+          "Check your email",
+          "We sent you a password reset link.",
+        );
+      } catch (error) {
+        console.error(
+          "Password reset error:",
+          error,
+        );
 
-    if (error) {
-      Alert.alert(
-        "Something went wrong",
-        error.message,
-      );
-      return;
-    }
-
-    Alert.alert(
-      "Check your email",
-      "We sent you a password reset link.",
-    );
-  };
+        Alert.alert(
+          "Something went wrong",
+          "Please try again.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
   return (
     <AnimatedScreen
       keyboardAvoiding
       scroll
     >
-      <View style={styles.form}>
-        <AuthInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-        />
+      <View
+        style={styles.container}
+      >
+        {/* =========================
+            BRAND
+        ========================== */}
 
-        <PasswordInput
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Enter your password"
-          visible={showPassword}
-          onToggleVisibility={() =>
-            setShowPassword(!showPassword)
-          }
-          autoComplete={
-            isLogin
-              ? "password"
-              : "new-password"
-          }
-        />
+        <View
+          style={styles.brand}
+        >
+          <View
+            style={
+              styles.logoContainer
+            }
+          >
+            <Logo
+              width={rw(94)}
+              height={rw(94)}
+            />
+          </View>
+        </View>
 
-        {!isLogin && (
+        {/* =========================
+            AUTH HEADER
+        ========================== */}
+
+        <View
+          style={styles.header}
+        >
+          <FontText
+            variant="h1"
+            style={styles.title}
+          >
+            {isLogin
+              ? "Welcome back"
+              : "Create your account"}
+          </FontText>
+
+          <FontText
+            variant="body"
+            style={
+              styles.description
+            }
+          >
+            {isLogin
+              ? "Log in to continue discovering fascinating facts."
+              : "Start your journey of discovering fascinating facts."}
+          </FontText>
+        </View>
+
+        {/* =========================
+            FORM
+        ========================== */}
+
+        <View
+          style={styles.form}
+        >
+          <AuthInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+          />
+
           <PasswordInput
-            label="Confirm password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Enter password again"
-            visible={showConfirmPassword}
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            visible={
+              showPassword
+            }
             onToggleVisibility={() =>
-              setShowConfirmPassword(
-                !showConfirmPassword,
+              setShowPassword(
+                !showPassword,
               )
             }
-            autoComplete="new-password"
+            autoComplete={
+              isLogin
+                ? "password"
+                : "new-password"
+            }
           />
-        )}
 
-        {isLogin && (
-          <Pressable
-            onPress={handleForgotPassword}
-            disabled={loading}
-            style={styles.forgotButton}
-          >
-            <FontText
-              variant="caption"
-              style={styles.forgotText}
+          {!isLogin && (
+            <PasswordInput
+              label="Confirm password"
+              value={
+                confirmPassword
+              }
+              onChangeText={
+                setConfirmPassword
+              }
+              placeholder="Enter password again"
+              visible={
+                showConfirmPassword
+              }
+              onToggleVisibility={() =>
+                setShowConfirmPassword(
+                  !showConfirmPassword,
+                )
+              }
+              autoComplete="new-password"
+            />
+          )}
+
+          {/* Forgot password */}
+
+          {isLogin && (
+            <Pressable
+              onPress={
+                handleForgotPassword
+              }
+              disabled={loading}
+              style={
+                styles.forgotButton
+              }
             >
-              Forgot password?
-            </FontText>
-          </Pressable>
-        )}
+              <FontText
+                variant="small"
+                style={
+                  styles.forgotText
+                }
+              >
+                Forgot password?
+              </FontText>
+            </Pressable>
+          )}
 
-        <AppButton
-          title={
-            isLogin
-              ? "Log in"
-              : "Create account"
+          {/* Submit */}
+
+          <AppButton
+            title={
+              isLogin
+                ? "Log in"
+                : "Create account"
+            }
+            loading={loading}
+            onPress={
+              handleSubmit
+            }
+          />
+        </View>
+
+        {/* =========================
+            BOTTOM SWITCH
+        ========================== */}
+
+        <View
+          style={
+            styles.bottomContainer
           }
-          loading={loading}
-          onPress={handleSubmit}
-        />
-      </View>
-
-      <View style={styles.switchContainer}>
-        <FontText
-          variant="small"
-          style={styles.switchText}
-        >
-          {isLogin
-            ? "Don't have an account?"
-            : "Already have an account?"}
-        </FontText>
-
-        <Pressable
-          onPress={switchMode}
-          disabled={loading}
-          style={styles.switchButton}
         >
           <FontText
             variant="small"
-            style={styles.switchAction}
+            style={
+              styles.bottomText
+            }
           >
-            {isLogin ? "Sign up" : "Log in"}
+            {isLogin
+              ? "Don't have an account?"
+              : "Already have an account?"}
           </FontText>
-        </Pressable>
+
+          <Pressable
+            onPress={
+              switchMode
+            }
+            disabled={loading}
+            hitSlop={8}
+          >
+            <FontText
+              variant="small"
+              style={
+                styles.bottomAction
+              }
+            >
+              {isLogin
+                ? "Sign up"
+                : "Log in"}
+            </FontText>
+          </Pressable>
+        </View>
+
+        {/* =========================
+            FOOTER
+        ========================== */}
+
+        <View
+          style={styles.footer}
+        >
+          <FontText
+            variant="caption"
+            style={
+              styles.footerText
+            }
+          >
+            By continuing, you agree to our Terms
+            and Privacy Policy.
+          </FontText>
+        </View>
       </View>
     </AnimatedScreen>
   );
 };
 
+export default AuthScreen;
+
 const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+    width: "100%",
+    paddingHorizontal: rw(10),
+    paddingTop: rh(18),
+    paddingBottom: rh(24),
+  },
+
+  /*
+   * BRAND
+   */
+
+  brand: {
+    alignItems: "center",
+    marginBottom: rh(26),
+  },
+
+  logoContainer: {
+    width: rw(64),
+    height: rw(64),
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: rh(8),
+  },
+
+  brandName: {
+    color: colors.textPrimary,
+    textAlign: "center",
+  },
+
+  brandSubtitle: {
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: rh(4),
+    maxWidth: rw(280),
+  },
+
+  /*
+   * HEADER
+   */
+
+  header: {
+    width: "100%",
+    marginBottom: rh(18),
+  },
+
+  title: {
+    color: colors.textPrimary,
+    fontSize: rw(28),
+    lineHeight: rw(34),
+  },
+
+  description: {
+    color: colors.textSecondary,
+    marginTop: rh(7),
+    lineHeight: rh(21),
+    maxWidth: rw(330),
+  },
+
+  /*
+   * LOGIN / SIGNUP SWITCH
+   */
+
+  modeContainer: {
+    width: "100%",
+    flexDirection: "row",
+    padding: rw(4),
+    borderRadius: rw(12),
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: rh(22),
+  },
+
+  modeButton: {
+    flex: 1,
+    minHeight: rh(42),
+    borderRadius: rw(9),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modeButtonActive: {
+    backgroundColor: colors.white,
+  },
+
+  modeText: {
+    color: colors.textMuted,
+  },
+
+  modeTextActive: {
+    color: colors.primary,
+    fontWeight: "700",
+  },
+
+  /*
+   * FORM
+   */
+
   form: {
     width: "100%",
   },
 
   forgotButton: {
     alignSelf: "flex-end",
-    marginTop: rh(-6),
+    marginTop: rh(-4),
     marginBottom: rh(20),
+    paddingVertical: rh(4),
+    paddingHorizontal: rw(2),
   },
 
   forgotText: {
     color: colors.primary,
+    fontWeight: "600",
   },
 
-  switchContainer: {
+  /*
+   * BOTTOM ACCOUNT SWITCH
+   */
+
+  bottomContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginTop: rh(24),
   },
 
-  switchText: {
+  bottomText: {
     color: colors.textSecondary,
   },
 
-  switchButton: {
-    marginLeft: rw(5),
-    paddingVertical: rh(3),
-  },
-
-  switchAction: {
-    fontFamily: "Inter-SemiBold",
+  bottomAction: {
     color: colors.primary,
+    fontWeight: "700",
+    marginLeft: rw(5),
   },
 
-  trustCard: {
-    marginTop: rh(28),
-  },
+  /*
+   * FOOTER
+   */
 
   footer: {
-    fontFamily: "Inter-Regular",
+    alignItems: "center",
+    marginTop: rh(20),
+    paddingHorizontal: rw(12),
+  },
+
+  footerText: {
     color: colors.textMuted,
     textAlign: "center",
-    marginTop: rh(22),
+    lineHeight: rh(17),
   },
 });
-
-export default AuthScreen;

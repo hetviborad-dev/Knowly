@@ -3,18 +3,37 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-import { RootStackParamList } from "../../types/navigation";
+import type {
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
+
+import type {
+  RootStackParamList,
+} from "../../types/navigation";
+
 import { colors } from "../../constant/colors";
 import { spacing } from "../../constant/spacing";
-import { typography } from "../../constant/typography";
+
 import AppButton from "../../components/common/AppButton";
 import FontText from "../../components/common/FontText";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Welcome">;
+import useDisableOnboardingBack from "../../hooks/useDisableOnboardingBack";
 
-const WelcomeScreen = ({ navigation }: Props) => {
+type Props = NativeStackScreenProps<
+  RootStackParamList,
+  "Welcome"
+>;
+
+const WelcomeScreen = ({
+  navigation,
+}: Props) => {
+  useDisableOnboardingBack();
+
+  const handleContinue = () => {
+    navigation.replace("AskName");
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
@@ -49,16 +68,16 @@ const WelcomeScreen = ({ navigation }: Props) => {
           variant="body"
           style={styles.description}
         >
-          Tell us what you're curious about and we'll
-          bring you interesting facts you'll actually
-          want to learn.
+          Tell us what you're curious about and
+          we'll bring you interesting facts
+          you'll actually want to learn.
         </FontText>
       </View>
 
       <View style={styles.bottom}>
         <AppButton
           title="Continue"
-          onPress={() => navigation.navigate("AskName")}
+          onPress={handleContinue}
         />
 
         <FontText

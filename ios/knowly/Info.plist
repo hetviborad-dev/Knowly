@@ -64,6 +64,10 @@
 		<string>Roboto-SemiBold.ttf</string>
 		<string>Roboto-Bold.ttf</string>
 		<string>Inter-SemiBold.ttf</string>
+		<string>NunitoSans-Light.ttf</string>
+		<string>NunitoSans-Regular.ttf</string>
+		<string>NunitoSans-Bold.ttf</string>
+		<string>NunitoSans-SemiBold.ttf</string>
 	</array>
 </dict>
 </plist>

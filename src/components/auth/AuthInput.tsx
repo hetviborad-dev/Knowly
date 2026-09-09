@@ -37,25 +37,26 @@ const AuthInput = ({
   );
 };
 
+export default AuthInput;
+
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
 
   label: {
-    color: colors.text,
+    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
 
   input: {
     height: 54,
     paddingHorizontal: spacing.lg,
-    borderRadius: rr(100),
-    backgroundColor: '#404040',
-    color: '#BEBEBE',
-    fontFamily: "Inter-Regular",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: rr(16),
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
     fontSize: 16,
   },
 });
-
-export default AuthInput;

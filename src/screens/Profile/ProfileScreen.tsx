@@ -15,14 +15,29 @@ import {
 } from "react-native";
 
 import Ionicons from "@react-native-vector-icons/ionicons";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { clearOnboardingData } from "../../services/storageService";
-import { supabase } from "../../lib/supabase";
+
+import type {
+  NativeStackNavigationProp,
+} from "@react-navigation/native-stack";
+
+import {
+  clearOnboardingData,
+} from "../../services/storageService";
+
+import {
+  supabase,
+} from "../../lib/supabase";
 
 import FontText from "../../components/common/FontText";
 
-import { colors } from "../../constant/colors";
-import { spacing } from "../../constant/spacing";
+import {
+  colors,
+} from "../../constant/colors";
+
+import {
+  spacing,
+} from "../../constant/spacing";
+
 import {
   rf,
   rw,
@@ -30,10 +45,14 @@ import {
   rr,
 } from "../../constant/responsive";
 
-import type { RootStackParamList } from "../../types/navigation";
+import type {
+  RootStackParamList,
+} from "../../types/navigation";
 
 type ProfileNavigationProp =
-  NativeStackNavigationProp<RootStackParamList>;
+  NativeStackNavigationProp<
+    RootStackParamList
+  >;
 
 type ProfileScreenProps = {
   navigation: ProfileNavigationProp;
@@ -47,22 +66,30 @@ type Profile = {
 const ProfileScreen = ({
   navigation,
 }: ProfileScreenProps) => {
-  const [profile, setProfile] =
-    useState<Profile | null>(null);
+  const [
+    profile,
+    setProfile,
+  ] = useState<Profile | null>(
+    null,
+  );
 
   const [loading, setLoading] =
     useState(true);
 
-  const [loggingOut, setLoggingOut] =
-    useState(false);
+  const [
+    loggingOut,
+    setLoggingOut,
+  ] = useState(false);
 
-  const fadeAnimation = useRef(
-    new Animated.Value(0),
-  ).current;
+  const fadeAnimation =
+    useRef(
+      new Animated.Value(0),
+    ).current;
 
-  const slideAnimation = useRef(
-    new Animated.Value(20),
-  ).current;
+  const slideAnimation =
+    useRef(
+      new Animated.Value(20),
+    ).current;
 
   useEffect(() => {
     loadProfile();
@@ -73,7 +100,8 @@ const ProfileScreen = ({
       const {
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser();
+      } =
+        await supabase.auth.getUser();
 
       if (userError) {
         throw userError;
@@ -84,12 +112,19 @@ const ProfileScreen = ({
         return;
       }
 
-      const { data, error } =
-        await supabase
-          .from("profiles")
-          .select("username, email")
-          .eq("id", user.id)
-          .single();
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("profiles")
+        .select(
+          "username, email",
+        )
+        .eq(
+          "id",
+          user.id,
+        )
+        .single();
 
       if (error) {
         throw error;
@@ -97,23 +132,33 @@ const ProfileScreen = ({
 
       setProfile({
         username:
-          data?.username ?? "Knowledge Explorer",
+          data?.username ??
+          "Knowledge Explorer",
+
         email:
-          data?.email ?? user.email ?? "",
+          data?.email ??
+          user.email ??
+          "",
       });
 
       Animated.parallel([
-        Animated.timing(fadeAnimation, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
+        Animated.timing(
+          fadeAnimation,
+          {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          },
+        ),
 
-        Animated.timing(slideAnimation, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
+        Animated.timing(
+          slideAnimation,
+          {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          },
+        ),
       ]).start();
     } catch (error) {
       console.error(
@@ -147,7 +192,9 @@ const ProfileScreen = ({
     try {
       setLoggingOut(true);
 
-      const { error } =
+      const {
+        error,
+      } =
         await supabase.auth.signOut();
 
       if (error) {
@@ -155,11 +202,22 @@ const ProfileScreen = ({
           "Logout failed",
           error.message,
         );
+
         return;
       }
-    await clearOnboardingData();
 
-      navigation.replace("Welcome");
+      /*
+       * Clear local onboarding data
+       */
+      await clearOnboardingData();
+
+      /*
+       * Completely leave
+       * authenticated navigation.
+       */
+      navigation.replace(
+        "Welcome",
+      );
     } catch (error) {
       console.error(
         "Logout error:",
@@ -177,7 +235,11 @@ const ProfileScreen = ({
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View
+        style={
+          styles.loadingContainer
+        }
+      >
         <ActivityIndicator
           size="small"
           color={colors.primary}
@@ -190,43 +252,58 @@ const ProfileScreen = ({
     profile?.username?.trim() ||
     "Knowledge Explorer";
 
-  const email = profile?.email ?? "";
+  const email =
+    profile?.email ?? "";
 
-  const avatarLetter = username
-    .charAt(0)
-    .toUpperCase();
+  const avatarLetter =
+    username
+      .charAt(0)
+      .toUpperCase();
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+      contentContainerStyle={
+        styles.content
+      }
+      showsVerticalScrollIndicator={
+        false
+      }
     >
       <Animated.View
         style={[
           styles.animatedContent,
           {
-            opacity: fadeAnimation,
+            opacity:
+              fadeAnimation,
+
             transform: [
               {
-                translateY: slideAnimation,
+                translateY:
+                  slideAnimation,
               },
             ],
           },
         ]}
       >
-        {/* Header */}
+        {/* HEADER */}
 
         <View style={styles.header}>
-          <View style={styles.avatar}>
+          <View
+            style={styles.avatar}
+          >
             <FontText
-              style={styles.avatarText}
+              style={
+                styles.avatarText
+              }
             >
               {avatarLetter}
             </FontText>
           </View>
 
-          <View style={styles.userInfo}>
+          <View
+            style={styles.userInfo}
+          >
             <FontText
               variant="caption"
               style={styles.eyebrow}
@@ -250,25 +327,39 @@ const ProfileScreen = ({
           </View>
         </View>
 
-        {/* Preferences */}
+        {/* PREFERENCES */}
 
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+        >
           <FontText
             variant="heading2"
-            style={styles.sectionTitle}
+            style={
+              styles.sectionTitle
+            }
           >
             Preferences
           </FontText>
 
-          <View style={styles.settingsCard}>
+          <View
+            style={
+              styles.settingsCard
+            }
+          >
             <Pressable
               onPress={() =>
-                navigation.navigate("SelectCategories", {
-  fromSettings: true,
-})
+                navigation.navigate(
+                  "SelectCategories",
+                  {
+                    fromSettings: true,
+                  },
+                )
               }
-              style={({ pressed }) => [
+              style={({
+                pressed,
+              }) => [
                 styles.settingRow,
+
                 pressed &&
                   styles.settingPressed,
               ]}
@@ -282,45 +373,63 @@ const ProfileScreen = ({
                 <Ionicons
                   name="options-outline"
                   size={rw(21)}
-                  color={colors.primary}
+                  color={
+                    colors.primary
+                  }
                 />
               </View>
 
-              <View style={styles.settingInfo}>
+              <View
+                style={
+                  styles.settingInfo
+                }
+              >
                 <FontText
                   variant="bodyMedium"
-                  style={styles.settingTitle}
+                  style={
+                    styles.settingTitle
+                  }
                 >
                   Your categories
                 </FontText>
 
                 <FontText
                   variant="small"
-                  style={styles.settingDescription}
+                  style={
+                    styles.settingDescription
+                  }
                 >
-                  Change the topics you want to
-                  discover
+                  Change the topics you
+                  want to discover
                 </FontText>
               </View>
 
               <Ionicons
                 name="chevron-forward"
                 size={rw(20)}
-                color={colors.textMuted}
+                color={
+                  colors.textMuted
+                }
               />
             </Pressable>
           </View>
         </View>
 
-        {/* Logout */}
+        {/* LOGOUT */}
 
         <Pressable
-          onPress={handleLogout}
+          onPress={
+            handleLogout
+          }
           disabled={loggingOut}
-          style={({ pressed }) => [
+          style={({
+            pressed,
+          }) => [
             styles.logoutButton,
+
             pressed &&
               styles.logoutPressed,
+
             loggingOut &&
               styles.logoutDisabled,
           ]}
@@ -340,7 +449,9 @@ const ProfileScreen = ({
 
               <FontText
                 variant="bodyMedium"
-                style={styles.logoutText}
+                style={
+                  styles.logoutText
+                }
               >
                 Log out
               </FontText>
@@ -352,10 +463,13 @@ const ProfileScreen = ({
   );
 };
 
+export default ProfileScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor:
+      colors.background,
   },
 
   content: {
@@ -372,7 +486,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.background,
+    backgroundColor:
+      colors.background,
   },
 
   header: {
@@ -386,13 +501,13 @@ const styles = StyleSheet.create({
     height: rw(72),
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary,
+    backgroundColor:
+      colors.primary,
     borderRadius: rr(24),
     marginRight: rw(16),
   },
 
   avatarText: {
-    fontFamily: "Inter-Bold",
     fontSize: rf(28),
     color: colors.white,
   },
@@ -413,7 +528,8 @@ const styles = StyleSheet.create({
   },
 
   email: {
-    color: colors.textSecondary,
+    color:
+      colors.textSecondary,
     marginTop: spacing.xs,
   },
 
@@ -427,7 +543,8 @@ const styles = StyleSheet.create({
   },
 
   settingsCard: {
-    backgroundColor: colors.surface,
+    backgroundColor:
+      colors.surface,
     borderRadius: rr(20),
     overflow: "hidden",
   },
@@ -452,7 +569,8 @@ const styles = StyleSheet.create({
   },
 
   categoryIcon: {
-    backgroundColor: "#EAF5FF",
+    backgroundColor:
+      "#EAF5FF",
   },
 
   settingInfo: {
@@ -464,7 +582,8 @@ const styles = StyleSheet.create({
   },
 
   settingDescription: {
-    color: colors.textSecondary,
+    color:
+      colors.textSecondary,
     marginTop: rh(3),
   },
 
@@ -475,7 +594,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#FECACA",
-    backgroundColor: "#FFF7F7",
+    backgroundColor:
+      "#FFF7F7",
     borderRadius: rr(17),
   },
 
@@ -492,5 +612,3 @@ const styles = StyleSheet.create({
     marginLeft: rw(8),
   },
 });
-
-export default ProfileScreen;

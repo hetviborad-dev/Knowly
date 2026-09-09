@@ -1,24 +1,39 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 
 import Ionicons from "@react-native-vector-icons/ionicons";
 
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import type {
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
 
-import { supabase } from "../../lib/supabase";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
+import {
+  supabase,
+} from "../../lib/supabase";
 
 import FontText from "../../components/common/FontText";
 
-import { colors } from "../../constant/colors";
-import { spacing } from "../../constant/spacing";
+import {
+  colors,
+} from "../../constant/colors";
 
 import {
   rf,
@@ -28,11 +43,14 @@ import {
 } from "../../constant/responsive";
 
 import {
-  getSelectedCategories,
+  saveOnboardingStep,
   saveSelectedCategories,
+  getSelectedCategories
 } from "../../services/storageService";
 
-import type { RootStackParamList } from "../../types/navigation";
+import type {
+  RootStackParamList,
+} from "../../types/navigation";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -47,18 +65,27 @@ type Category = {
   description: string | null;
 };
 
+const REQUIRED_COUNT = 2;
+
 const SelectCategoriesScreen = ({
   navigation,
   route,
 }: Props) => {
+  const insets =
+    useSafeAreaInsets();
+
   const isFromSettings =
     route.params?.fromSettings === true;
 
-  const [categories, setCategories] =
-    useState<Category[]>([]);
+  const [
+    categories,
+    setCategories,
+  ] = useState<Category[]>([]);
 
-  const [selectedCategories, setSelectedCategories] =
-    useState<string[]>([]);
+  const [
+    selectedCategories,
+    setSelectedCategories,
+  ] = useState<string[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -66,382 +93,650 @@ const SelectCategoriesScreen = ({
   const [saving, setSaving] =
     useState(false);
 
+  /*
+   * Disable Android back
+   * ONLY during onboarding.
+   */
   useEffect(() => {
-    loadCategories();
-  }, []);
+    if (isFromSettings) {
+      return;
+    }
 
-  const loadCategories = async () => {
-    try {
-      setLoading(true);
+    const subscription =
+      BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => true,
+      );
 
-      // Get all categories
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("categories")
-        .select(
-          "id, name, slug, icon, description",
-        )
-        .order("name");
+    return () => {
+      subscription.remove();
+    };
+  }, [isFromSettings]);
 
-      if (error) {
-        throw error;
-      }
+  /*
+   * Load categories
+   */
+  const loadCategories =
+    useCallback(async () => {
+      try {
+        setLoading(true);
 
-      setCategories(data ?? []);
-
-      // --------------------------------
-      // SETTINGS / RESELECTION MODE
-      // --------------------------------
-
-      if (isFromSettings) {
         const {
-          data: {
-            user,
-          },
-        } = await supabase.auth.getUser();
+          data,
+          error,
+        } = await supabase
+          .from("categories")
+          .select(
+            "id, name, slug, icon, description",
+          )
+          .order("name");
 
-        if (!user) {
+        if (error) {
+          throw error;
+        }
+
+        setCategories(
+          data ?? [],
+        );
+
+        /*
+         * SETTINGS MODE
+         */
+        if (isFromSettings) {
+          const {
+            data: {
+              user,
+            },
+          } =
+            await supabase.auth.getUser();
+
+          if (!user) {
+            throw new Error(
+              "User is not logged in.",
+            );
+          }
+
+          const {
+            data: userCategories,
+            error:
+              userCategoriesError,
+          } = await supabase
+            .from("user_categories")
+            .select(
+              "category_id",
+            )
+            .eq(
+              "user_id",
+              user.id,
+            );
+
+          if (
+            userCategoriesError
+          ) {
+            throw userCategoriesError;
+          }
+
+          const selectedIds =
+            userCategories?.map(
+              item =>
+                item.category_id,
+            ) ?? [];
+
+          setSelectedCategories(
+            selectedIds,
+          );
+
+          await saveSelectedCategories(
+            selectedIds,
+          );
+
           return;
         }
 
-        const {
-          data: userCategories,
-          error: userCategoriesError,
-        } = await supabase
-          .from("user_categories")
-          .select("category_id")
-          .eq("user_id", user.id);
-
-        if (userCategoriesError) {
-          throw userCategoriesError;
-        }
-
-        const selectedIds =
-          userCategories?.map(
-            item => item.category_id,
-          ) ?? [];
-
-        setSelectedCategories(selectedIds);
-
-        // Keep AsyncStorage synchronized
-        await saveSelectedCategories(
-          selectedIds,
-        );
-      }
-
-      // --------------------------------
-      // ONBOARDING MODE
-      // --------------------------------
-
-      else {
+        /*
+         * ONBOARDING MODE
+         */
         const savedCategories =
           await getSelectedCategories();
 
         setSelectedCategories(
-          savedCategories,
+          savedCategories.slice(
+            0,
+            REQUIRED_COUNT,
+          ),
         );
+      } catch (error) {
+        console.error(
+          "Failed to load categories:",
+          error,
+        );
+
+        Alert.alert(
+          "Something went wrong",
+          "Unable to load categories. Please try again.",
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error(
-        "Failed to load categories:",
-        error,
-      );
+    }, [
+      isFromSettings,
+    ]);
 
-      Alert.alert(
-        "Something went wrong",
-        "Unable to load categories. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
+  /*
+   * Toggle category
+   */
   const toggleCategory = (
     categoryId: string,
   ) => {
-    setSelectedCategories(previous => {
-      if (
-        previous.includes(categoryId)
-      ) {
-        return previous.filter(
-          id => id !== categoryId,
-        );
-      }
+    setSelectedCategories(
+      previous => {
+        /*
+         * Selected → remove
+         */
+        if (
+          previous.includes(
+            categoryId,
+          )
+        ) {
+          return previous.filter(
+            id =>
+              id !== categoryId,
+          );
+        }
 
-      return [
-        ...previous,
-        categoryId,
-      ];
-    });
-  };
+        /*
+         * ONBOARDING:
+         * Maximum exactly 2.
+         */
+        if (
+          !isFromSettings &&
+          previous.length >=
+            REQUIRED_COUNT
+        ) {
+          return previous;
+        }
 
-  const saveCategoriesToSupabase = async () => {
-    const {
-      data: {
-        user,
+        /*
+         * SETTINGS:
+         * Unlimited.
+         */
+        return [
+          ...previous,
+          categoryId,
+        ];
       },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error(
-        "User is not logged in.",
-      );
-    }
-
-    // Remove old selections
-    const {
-      error: deleteError,
-    } = await supabase
-      .from("user_categories")
-      .delete()
-      .eq("user_id", user.id);
-
-    if (deleteError) {
-      throw deleteError;
-    }
-
-    // Insert new selections
-    if (
-      selectedCategories.length > 0
-    ) {
-      const rows =
-        selectedCategories.map(
-          categoryId => ({
-            user_id: user.id,
-            category_id: categoryId,
-          }),
-        );
-
-      const {
-        error: insertError,
-      } = await supabase
-        .from("user_categories")
-        .insert(rows);
-
-      if (insertError) {
-        throw insertError;
-      }
-    }
-
-    // Also update local storage
-    await saveSelectedCategories(
-      selectedCategories,
     );
   };
 
-  const handleContinue = async () => {
-    // At least 2 categories required
-    if (
-      selectedCategories.length < 2
-    ) {
-      Alert.alert(
-        "Select at least 2",
-        "Choose at least 2 categories to personalize your facts.",
-      );
+  /*
+   * Save to Supabase
+   */
+  const saveCategoriesToSupabase =
+    async () => {
+      const {
+        data: {
+          user,
+        },
+      } =
+        await supabase.auth.getUser();
 
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      // --------------------------------
-      // RESELECTION FROM HOME / PROFILE
-      // --------------------------------
-
-      if (isFromSettings) {
-        await saveCategoriesToSupabase();
-
-        // Go back to the previous screen
-        navigation.goBack();
-
-        return;
+      if (!user) {
+        throw new Error(
+          "User is not logged in.",
+        );
       }
 
-      // --------------------------------
-      // ONBOARDING
-      // --------------------------------
+      /*
+       * Delete old selections
+       */
+      const {
+        error: deleteError,
+      } = await supabase
+        .from("user_categories")
+        .delete()
+        .eq(
+          "user_id",
+          user.id,
+        );
 
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      /*
+       * Insert new selections
+       */
+      if (
+        selectedCategories.length >
+        0
+      ) {
+        const rows =
+          selectedCategories.map(
+            categoryId => ({
+              user_id: user.id,
+              category_id:
+                categoryId,
+            }),
+          );
+
+        const {
+          error: insertError,
+        } =
+          await supabase
+            .from(
+              "user_categories",
+            )
+            .insert(rows);
+
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      /*
+       * Keep AsyncStorage synced
+       */
       await saveSelectedCategories(
         selectedCategories,
       );
+    };
 
-      navigation.navigate("Auth");
-    } catch (error) {
-      console.error(
-        "Failed to save categories:",
-        error,
+  /*
+   * Continue / Save
+   */
+  const handleContinue =
+    async () => {
+      /*
+       * Minimum 2
+       */
+      if (
+        selectedCategories.length <
+        REQUIRED_COUNT
+      ) {
+        return;
+      }
+
+      try {
+        setSaving(true);
+
+        /*
+         * SETTINGS
+         */
+        if (isFromSettings) {
+          await saveCategoriesToSupabase();
+
+          navigation.goBack();
+
+          return;
+        }
+
+        /*
+         * ONBOARDING
+         */
+        await saveSelectedCategories(
+          selectedCategories,
+        );
+await saveOnboardingStep("CATEGORIES");
+
+        navigation.replace(
+          "Auth",
+        );
+      } catch (error) {
+        console.error(
+          "Failed to save categories:",
+          error,
+        );
+
+        Alert.alert(
+          "Save failed",
+          "We couldn't save your categories. Please try again.",
+        );
+      } finally {
+        setSaving(false);
+      }
+    };
+
+  const remaining =
+    Math.max(
+      REQUIRED_COUNT -
+        selectedCategories.length,
+      0,
+    );
+
+  const isComplete =
+    selectedCategories.length >=
+    REQUIRED_COUNT;
+
+  const progress =
+    Math.min(
+      selectedCategories.length,
+      REQUIRED_COUNT,
+    ) / REQUIRED_COUNT;
+
+  /*
+   * Category card
+   */
+  const renderCategory = ({
+    item,
+  }: {
+    item: Category;
+  }) => {
+    const isSelected =
+      selectedCategories.includes(
+        item.id,
       );
 
-      Alert.alert(
-        "Save failed",
-        "We couldn't save your categories. Please try again.",
-      );
-    } finally {
-      setSaving(false);
-    }
+    /*
+     * During onboarding:
+     * once 2 are selected,
+     * disable unselected cards.
+     */
+    const isDisabled =
+      !isFromSettings &&
+      !isSelected &&
+      selectedCategories.length >=
+        REQUIRED_COUNT;
+
+    return (
+      <Pressable
+        onPress={() =>
+          toggleCategory(item.id)
+        }
+        disabled={isDisabled}
+        style={({ pressed }) => [
+          styles.categoryCard,
+
+          isSelected &&
+            styles.categoryCardSelected,
+
+          isDisabled &&
+            styles.categoryCardDisabled,
+
+          pressed &&
+            styles.categoryCardPressed,
+        ]}
+      >
+        <View
+          style={
+            styles.iconContainer
+          }
+        >
+          <Ionicons
+            name={
+              (item.icon ||
+                "sparkles-outline") as any
+            }
+            size={rf(25)}
+            color={
+              isSelected
+                ? colors.accent
+                : colors.white
+            }
+          />
+        </View>
+
+        <FontText
+          variant="bodyMedium"
+          style={[
+            styles.categoryName,
+
+            isSelected &&
+              styles.categoryNameSelected,
+          ]}
+          numberOfLines={2}
+        >
+          {item.name}
+        </FontText>
+
+        {isSelected && (
+          <View
+            style={
+              styles.checkContainer
+            }
+          >
+            <Ionicons
+              name="checkmark"
+              size={rf(13)}
+              color="#141414"
+            />
+          </View>
+        )}
+      </Pressable>
+    );
   };
 
+  /*
+   * Loading
+   */
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView
+        style={
+          styles.loadingContainer
+        }
+        edges={[
+          "top",
+          "bottom",
+        ]}
+      >
         <ActivityIndicator
           size="large"
           color={colors.primary}
         />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={
-          styles.scrollContent
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
+    <SafeAreaView
+      style={styles.container}
+      edges={[
+        "top",
+        "bottom",
+      ]}
+    >
+      {/* TOP BAR */}
 
-        <View style={styles.header}>
-          <FontText
-            variant="heading1"
-            style={styles.title}
+      <View style={styles.topBar}>
+        {isFromSettings ? (
+          <Pressable
+            onPress={() =>
+              navigation.goBack()
+            }
+            style={({
+              pressed,
+            }) => [
+              styles.backButton,
+
+              pressed &&
+                styles.iconButtonPressed,
+            ]}
+            hitSlop={10}
           >
-            {isFromSettings
-              ? "Your categories"
-              : "What are you interested in?"}
-          </FontText>
+            <Ionicons
+              name="chevron-back"
+              size={rw(20)}
+              color={colors.white}
+            />
+          </Pressable>
+        ) : (
+          /*
+           * Empty space keeps
+           * progress aligned.
+           */
+          <View
+            style={
+              styles.backButtonPlaceholder
+            }
+          />
+        )}
 
-          <FontText
-            variant="body"
-            style={styles.subtitle}
-          >
-            {isFromSettings
-              ? "Choose the topics you want to discover."
-              : "Pick at least 2 topics to personalize your facts."}
-          </FontText>
-        </View>
+        {!isFromSettings ? (
+          <>
+            <View
+              style={
+                styles.progressContainer
+              }
+            >
+              <View
+                style={
+                  styles.progressBackground
+                }
+              >
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${
+                        progress * 100
+                      }%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
 
-        {/* Selected count */}
-
-        <View style={styles.selectedContainer}>
-          <FontText
-            variant="small"
-            style={styles.selectedText}
-          >
-            {selectedCategories.length} selected
-          </FontText>
-
-          {selectedCategories.length < 2 && (
             <FontText
               variant="small"
-              style={styles.minimumText}
+              style={
+                styles.progressLabel
+              }
             >
-              • Select at least 2
+              {
+                selectedCategories.length
+              }
+              /{REQUIRED_COUNT}
             </FontText>
-          )}
-        </View>
+          </>
+        ) : (
+          <View
+            style={
+              styles.settingsTopTitle
+            }
+          >
+            <FontText
+              variant="bodyMedium"
+              style={
+                styles.settingsTitle
+              }
+            >
+              Categories
+            </FontText>
+          </View>
+        )}
+      </View>
 
-        {/* Categories */}
+      {/* HEADER */}
 
-        <View style={styles.grid}>
-          {categories.map(category => {
-            const isSelected =
-              selectedCategories.includes(
-                category.id,
-              );
+      <View style={styles.header}>
+        <FontText
+          variant="caption"
+          style={styles.eyebrow}
+        >
+          {isFromSettings
+            ? "YOUR INTERESTS"
+            : "STEP 1 OF 3 · TASTE"}
+        </FontText>
 
-            return (
-              <Pressable
-                key={category.id}
-                onPress={() =>
-                  toggleCategory(
-                    category.id,
-                  )
+        <FontText
+          variant="display"
+          style={styles.title}
+        >
+          {isFromSettings ? (
+            "Choose what you want to discover."
+          ) : (
+            <>
+              Pick two things you'll
+              never stop{" "}
+              <FontText
+                variant="display"
+                style={
+                  styles.titleAccent
                 }
-                style={({ pressed }) => [
-                  styles.categoryCard,
-                  isSelected &&
-                    styles.categoryCardSelected,
-                  pressed &&
-                    styles.categoryCardPressed,
-                ]}
               >
-                {/* Icon */}
+                wondering
+              </FontText>{" "}
+              about.
+            </>
+          )}
+        </FontText>
 
-                <View
-                  style={[
-                    styles.iconContainer,
-                    isSelected &&
-                      styles.iconContainerSelected,
-                  ]}
-                >
-                  <FontText
-                    style={styles.categoryIcon}
-                  >
-                    {category.icon || "✨"}
-                  </FontText>
-                </View>
+        <FontText
+          variant="body"
+          style={styles.subtitle}
+        >
+          {isFromSettings
+            ? "Select 2 or more categories. You can change your interests anytime."
+            : "Choose exactly 2 categories to personalize your facts."}
+        </FontText>
+      </View>
 
-                {/* Name */}
+      {/* CATEGORIES */}
 
-                <FontText
-                  variant="bodyMedium"
-                  style={[
-                    styles.categoryName,
-                    isSelected &&
-                      styles.categoryNameSelected,
-                  ]}
-                  numberOfLines={2}
-                >
-                  {category.name}
-                </FontText>
+      <FlatList
+        data={categories}
+        renderItem={
+          renderCategory
+        }
+        keyExtractor={item =>
+          item.id
+        }
+        numColumns={3}
+        showsVerticalScrollIndicator={
+          false
+        }
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingBottom:
+              rh(110) +
+              insets.bottom,
+          },
+        ]}
+        columnWrapperStyle={
+          styles.columnWrapper
+        }
+        initialNumToRender={12}
+        removeClippedSubviews
+      />
 
-                {/* Check */}
+      {/* BOTTOM BUTTON */}
 
-                <View
-                  style={[
-                    styles.checkContainer,
-                    isSelected &&
-                      styles.checkContainerSelected,
-                  ]}
-                >
-                  {isSelected && (
-                    <Ionicons
-                      name="checkmark"
-                      size={rw(15)}
-                      color={colors.white}
-                    />
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
-
-      {/* Bottom Button */}
-
-      <View style={styles.bottomContainer}>
+      <View
+        style={[
+          styles.bottomContainer,
+          {
+            paddingBottom:
+              insets.bottom +
+              rh(14),
+          },
+        ]}
+      >
         <Pressable
-          onPress={handleContinue}
+          onPress={
+            handleContinue
+          }
           disabled={
             saving ||
-            selectedCategories.length < 2
+            !isComplete
           }
-          style={({ pressed }) => [
+          style={({
+            pressed,
+          }) => [
             styles.continueButton,
-            selectedCategories.length <
-              2 &&
+
+            !isComplete &&
               styles.continueButtonDisabled,
+
             saving &&
               styles.continueButtonDisabled,
+
             pressed &&
-              selectedCategories.length >=
-                2 &&
+              isComplete &&
               styles.continueButtonPressed,
           ]}
         >
@@ -451,166 +746,216 @@ const SelectCategoriesScreen = ({
               color={colors.white}
             />
           ) : (
-            <>
-              <FontText
-                variant="bodyMedium"
-                style={styles.continueText}
-              >
-                {isFromSettings
-                  ? "Save changes"
-                  : "Continue"}
-              </FontText>
+            <FontText
+              variant="bodyMedium"
+              style={[
+                styles.continueText,
 
-              <Ionicons
-                name={
-                  isFromSettings
-                    ? "checkmark"
-                    : "arrow-forward"
-                }
-                size={rw(20)}
-                color={colors.white}
-              />
-            </>
+                isComplete &&
+                  styles.continueTextActive,
+              ]}
+            >
+              {isComplete
+                ? isFromSettings
+                  ? "Save changes"
+                  : "Continue"
+                : `Pick ${remaining} more`}
+            </FontText>
           )}
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
+
+export default SelectCategoriesScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor:
-      colors.background,
+    backgroundColor: "#141414",
   },
 
   loadingContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor:
-      colors.background,
+    backgroundColor: "#141414",
   },
 
-  scrollContent: {
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: rw(20),
-    paddingTop: rh(28),
-    paddingBottom: rh(120),
+    paddingTop: rh(10),
+    paddingBottom: rh(10),
+    gap: rw(14),
+  },
+
+  backButton: {
+    width: rw(40),
+    height: rw(40),
+    borderRadius: rr(20),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      "rgba(255,255,255,0.08)",
+  },
+
+  backButtonPlaceholder: {
+    width: rw(40),
+    height: rw(40),
+  },
+
+  iconButtonPressed: {
+    opacity: 0.65,
+  },
+
+  progressContainer: {
+    flex: 1,
+  },
+
+  progressBackground: {
+    height: rh(4),
+    borderRadius: rr(4),
+    backgroundColor:
+      "rgba(255,255,255,0.15)",
+    overflow: "hidden",
+  },
+
+  progressFill: {
+    height: "100%",
+    backgroundColor:
+      "rgba(255,255,255,0.6)",
+    borderRadius: rr(4),
+  },
+
+  progressLabel: {
+    color:
+      "rgba(255,255,255,0.5)",
+    fontSize: rf(13),
+  },
+
+  settingsTopTitle: {
+    flex: 1,
+  },
+
+  settingsTitle: {
+    color: colors.white,
+    fontSize: rf(17),
   },
 
   header: {
-    marginBottom: rh(20),
+    paddingHorizontal: rw(20),
+    paddingTop: rh(10),
+    paddingBottom: rh(18),
   },
 
-  title: {
-    color: colors.text,
-    marginBottom: rh(8),
-  },
-
-  subtitle: {
-    color: colors.textSecondary,
-    lineHeight: rf(22),
-  },
-
-  selectedContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  eyebrow: {
+    color: colors.accent,
+    letterSpacing: 1.4,
+    fontSize: rf(12),
     marginBottom: rh(16),
   },
 
-  selectedText: {
-    color: colors.primary,
-    fontFamily: "Inter-SemiBold",
+  title: {
+    color: colors.white,
+    fontSize: rf(32),
+    lineHeight: rf(39),
   },
 
-  minimumText: {
-    color: colors.textMuted,
-    marginLeft: rw(6),
+  titleAccent: {
+    color: colors.accent,
+    fontStyle: "italic",
+    fontSize: rf(32),
+    lineHeight: rf(39),
   },
 
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  subtitle: {
+    color:
+      "rgba(255,255,255,0.55)",
+    lineHeight: rf(22),
+    marginTop: rh(12),
+  },
+
+  listContent: {
+    paddingHorizontal: rw(20),
+    paddingTop: rh(4),
+  },
+
+  columnWrapper: {
     justifyContent:
       "space-between",
+    marginBottom: rh(12),
   },
 
   categoryCard: {
-    width: "48%",
-    minHeight: rh(130),
+    width: "31.5%",
+    minHeight: rh(112),
     backgroundColor:
-      colors.surface,
-    borderRadius: rr(20),
-    padding: rw(15),
-    marginBottom: rh(14),
-    borderWidth: 1.5,
+      "rgba(255,255,255,0.06)",
+    borderRadius: rr(18),
+    padding: rw(13),
+    borderWidth: 1,
     borderColor:
-      colors.border,
+      "rgba(255,255,255,0.10)",
+    justifyContent:
+      "space-between",
     position: "relative",
   },
 
   categoryCardSelected: {
-    backgroundColor: "#EAF5FF",
+    backgroundColor:
+      "rgba(255,172,4,0.14)",
     borderColor:
-      colors.primary,
+      colors.accent,
+  },
+
+  categoryCardDisabled: {
+    opacity: 0.35,
   },
 
   categoryCardPressed: {
     opacity: 0.7,
+    transform: [
+      {
+        scale: 0.98,
+      },
+    ],
   },
 
   iconContainer: {
-    width: rw(46),
-    height: rw(46),
-    borderRadius: rr(15),
+    width: rw(38),
+    height: rw(38),
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: rr(12),
     backgroundColor:
-      colors.white,
-    marginBottom: rh(12),
-  },
-
-  iconContainerSelected: {
-    backgroundColor:
-      colors.white,
-  },
-
-  categoryIcon: {
-    fontSize: rf(23),
+      "rgba(255,255,255,0.06)",
   },
 
   categoryName: {
-    color: colors.text,
-    paddingRight: rw(18),
+    color: colors.white,
+    fontSize: rf(14),
+    marginTop: rh(10),
+    paddingRight: rw(4),
   },
 
   categoryNameSelected: {
-    color: colors.primary,
-    fontFamily: "Inter-SemiBold",
+    color: colors.accent,
   },
 
   checkContainer: {
     position: "absolute",
-    top: rw(13),
-    right: rw(13),
-    width: rw(23),
-    height: rw(23),
-    borderRadius: rr(12),
-    borderWidth: 1.5,
-    borderColor:
-      colors.border,
+    top: rw(10),
+    right: rw(10),
+    width: rw(22),
+    height: rw(22),
+    borderRadius: rr(11),
+    backgroundColor:
+      colors.accent,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor:
-      colors.white,
-  },
-
-  checkContainerSelected: {
-    backgroundColor:
-      colors.primary,
-    borderColor:
-      colors.primary,
   },
 
   bottomContainer: {
@@ -619,37 +964,36 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: rw(20),
-    paddingTop: rh(12),
-    paddingBottom: rh(20),
+    paddingTop: rh(14),
     backgroundColor:
-      colors.background,
-    borderTopWidth: 1,
-    borderTopColor:
-      colors.border,
+      "rgba(20,20,20,0.96)",
   },
 
   continueButton: {
-    height: rh(54),
-    borderRadius: rr(18),
+    height: rh(56),
+    borderRadius: rr(30),
     backgroundColor:
-      colors.primary,
-    flexDirection: "row",
+      "rgba(255,255,255,0.10)",
     alignItems: "center",
     justifyContent: "center",
-    gap: rw(9),
   },
 
   continueButtonDisabled: {
-    opacity: 0.45,
+    backgroundColor:
+      "rgba(255,255,255,0.08)",
   },
 
   continueButtonPressed: {
-    opacity: 0.75,
+    backgroundColor:
+      "rgba(255,255,255,0.16)",
   },
 
   continueText: {
+    color:
+      "rgba(255,255,255,0.40)",
+  },
+
+  continueTextActive: {
     color: colors.white,
   },
 });
-
-export default SelectCategoriesScreen;

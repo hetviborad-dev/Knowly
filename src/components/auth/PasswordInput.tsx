@@ -6,6 +6,8 @@ import {
   View,
 } from "react-native";
 
+import Ionicons from "@react-native-vector-icons/ionicons";
+
 import { colors } from "../../constant/colors";
 import { spacing } from "../../constant/spacing";
 import { rr } from "../../constant/responsive";
@@ -47,32 +49,40 @@ const PasswordInput = ({
           placeholderTextColor={colors.textMuted}
           secureTextEntry={!visible}
           autoComplete={autoComplete}
+          autoCapitalize="none"
+          autoCorrect={false}
           style={styles.input}
         />
 
         <Pressable
           onPress={onToggleVisibility}
           hitSlop={10}
+          style={styles.eyeButton}
         >
-          <FontText
-            variant="small"
-            style={styles.action}
-          >
-            {visible ? "Hide" : "Show"}
-          </FontText>
+          <Ionicons
+            name={
+              visible
+                ? "eye-outline"
+                : "eye-off-outline"
+            }
+            size={21}
+            color={colors.textMuted}
+          />
         </Pressable>
       </View>
     </View>
   );
 };
 
+export default PasswordInput;
+
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
 
   label: {
-    color: colors.text,
+    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
 
@@ -90,14 +100,14 @@ const styles = StyleSheet.create({
 
   input: {
     flex: 1,
-    color: colors.text,
-    fontFamily: "Inter-Regular",
+    color: colors.textPrimary,
     fontSize: 16,
   },
 
-  action: {
-    color: colors.primary,
+  eyeButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
-
-export default PasswordInput;
