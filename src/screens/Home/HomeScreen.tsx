@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,6 +17,7 @@ import { rh, rw } from "../../constant/responsive";
 
 import { getUserName } from "../../services/storageService";
 import { getTodaysFact } from "../../services/factService";
+import Logo from "../../assets/svgs/logo.svg";
 
 type Fact = {
   id: string;
@@ -35,9 +36,7 @@ type HomeScreenProps = {
   navigation: any;
 };
 
-const HomeScreen = ({
-  navigation,
-}: HomeScreenProps) => {
+const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const [username, setUsername] = useState("there");
   const [fact, setFact] = useState<Fact | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,10 +56,7 @@ const HomeScreen = ({
 
         setFact(todaysFact);
       } catch (error) {
-        console.error(
-          "Failed to load home:",
-          error,
-        );
+        console.error("Failed to load home:", error);
       } finally {
         setLoading(false);
       }
@@ -69,6 +65,36 @@ const HomeScreen = ({
     loadHome();
   }, []);
 
+  const readingTime = useMemo(() => {
+    if (!fact?.content) {
+      return "20s read";
+    }
+
+    const wordCount = fact.content.trim().split(/\s+/).length;
+    const seconds = Math.max(15, Math.ceil((wordCount / 180) * 60));
+
+    return `${seconds}s read`;
+  }, [fact?.content]);
+
+  const factNumber = useMemo(() => {
+    if (!fact) {
+      return "01";
+    }
+
+    /*
+      Uses the last three characters from the fact ID as a display number.
+      This avoids hardcoding a number such as 378 while keeping the card
+      visually similar to the reference image.
+    */
+    const numericPart = fact.id.replace(/\D/g, "").slice(-3);
+
+    if (numericPart) {
+      return numericPart.padStart(3, "0");
+    }
+
+    return "001";
+  }, [fact]);
+
   const handleShare = async () => {
     if (!fact) {
       return;
@@ -76,145 +102,213 @@ const HomeScreen = ({
 
     try {
       await Share.share({
-        message: fact.content,
+        title: fact.title || "Today's fact",
+        message: `${fact.content}${
+          fact.source ? `\n\nSource: ${fact.source}` : ""
+        }`,
       });
     } catch (error) {
-      console.error(
-        "Failed to share fact:",
-        error,
-      );
+      console.error("Failed to share fact:", error);
     }
   };
 
   const handleSave = () => {
     setSaved((current) => !current);
 
-    // We will connect this to Supabase
-    // saved facts later.
+    /*
+      Connect this action to your Supabase saved_facts table later.
+      The visual state already works now.
+    */
+  };
+
+  const handleCategorySelection = () => {
+    navigation.navigate("SelectCategories", {
+      fromSettings: true,
+    });
   };
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator
-          size="small"
-          color={colors.primary}
-        />
+        <ActivityIndicator size="small" color={colors.primary} />
       </View>
     );
   }
 
   if (!fact) {
     return (
-      <View style={styles.center}>
-        <FontText variant="heading2">
-          Nothing to discover yet.
-        </FontText>
+      <AnimatedScreen>
+        <View style={styles.center}>
+          <View style={styles.emptyIcon}>
+            <Ionicons
+              name="sparkles-outline"
+              size={rw(30)}
+              color={colors.primary}
+            />
+          </View>
 
-        <FontText
-          variant="body"
-          style={styles.emptyText}
-        >
-          Check back soon for something worth knowing.
-        </FontText>
-      </View>
+          <FontText variant="heading2" style={styles.emptyTitle}>
+            Nothing to discover yet.
+          </FontText>
+
+          <FontText variant="body" style={styles.emptyText}>
+            Check back soon for something worth knowing.
+          </FontText>
+
+          <Pressable
+            onPress={handleCategorySelection}
+            style={styles.emptyCategoryButton}
+          >
+            <Ionicons
+              name="options-outline"
+              size={rw(19)}
+              color={colors.white}
+            />
+
+            <FontText variant="body" style={styles.emptyCategoryButtonText}>
+              Choose interests
+            </FontText>
+          </Pressable>
+        </View>
+      </AnimatedScreen>
     );
   }
 
   return (
     <AnimatedScreen>
       <View style={styles.container}>
-
-        {/* Header */}
+        {/* Header: app mark + greeting on left, category selector on right */}
         <View style={styles.header}>
-          <FontText
-            variant="heading2"
-            style={styles.greeting}
-          >
-            Hello, {username}
-          </FontText>
+          <View style={styles.brandGroup}>
+            <View style={styles.logoMark}>
+              {/* <Ionicons
+                name="bulb-outline"
+                size={rw(21)}
+                color={colors.primary}
+              /> */}
+              <Logo
+              width={rw(44)}
+              height={rw(44)}
+            />
+            </View>
+
+            <View>
+              <FontText variant="caption" style={styles.eyebrow}>
+                DISCOVER SOMETHING NEW
+              </FontText>
+
+              <FontText variant="heading2" style={styles.greeting}>
+                Hello, {username}
+              </FontText>
+            </View>
+          </View>
 
           <Pressable
-            onPress={() =>
-              navigation.navigate("SelectCategories", {
-  fromSettings: true,
-})
-            }
+            onPress={handleCategorySelection}
             style={styles.categoryButton}
             hitSlop={10}
           >
             <Ionicons
               name="options-outline"
-              size={rw(23)}
+              size={rw(22)}
               color={colors.text}
             />
           </Pressable>
         </View>
 
-        {/* Today's Fact */}
-        <FontText
-          variant="heading2"
-          style={styles.sectionTitle}
-        >
-          Today's Fact
-        </FontText>
-
-        {/* Fact Card */}
-        <View style={styles.factCard}>
-
-          {/* Category */}
-          <View style={styles.categoryBadge}>
-            <FontText
-              variant="caption"
-              style={styles.categoryText}
-            >
-              {fact.categories?.name ?? "Fact"}
+        {/* Screen section title */}
+        <View style={styles.titleRow}>
+          <FontText variant="heading2" style={styles.sectionTitle}>
+            Today&apos;s{" "}
+            <FontText variant="heading2" style={styles.sectionTitleAccent}>
+              fact
             </FontText>
-          </View>
-
-          {/* Fact */}
-          <FontText
-            variant="body"
-            style={styles.factText}
-          >
-            {fact.content}
           </FontText>
+        </View>
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            <Pressable
-              onPress={handleSave}
-              style={styles.actionButton}
-              hitSlop={8}
-            >
-              <Ionicons
-                name={
-                  saved
-                    ? "bookmark"
-                    : "bookmark-outline"
-                }
-                size={rw(23)}
-                color={
-                  saved
-                    ? colors.primary
-                    : colors.textSecondary
-                }
-              />
-            </Pressable>
+        {/* Main fact card */}
+        <View style={styles.factCard}>
+          {/* Visual gradient-like decorative circles */}
+          <View style={styles.glowLarge} />
+          <View style={styles.glowSmall} />
+          <View style={styles.cardOverlay} />
 
-            <Pressable
-              onPress={handleShare}
-              style={styles.actionButton}
-              hitSlop={8}
-            >
-              <Ionicons
-                name="share-outline"
-                size={rw(23)}
-                color={colors.textSecondary}
-              />
-            </Pressable>
+          <View style={styles.cardContent}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.categoryBadge}>
+                <FontText variant="caption" style={styles.categoryText}>
+                  {(fact.categories?.name ?? "Fact").toUpperCase()}
+                </FontText>
+              </View>
+
+              <FontText variant="caption" style={styles.readTimeText}>
+                {readingTime}
+              </FontText>
+            </View>
+
+            <View style={styles.factMainContent}>
+              <FontText variant="heading2" style={styles.factNumber}>
+                {factNumber}
+              </FontText>
+
+              {fact.title ? (
+                <FontText variant="body" style={styles.factTitle}>
+                  {fact.title}
+                </FontText>
+              ) : null}
+
+              <FontText variant="body" style={styles.factText}>
+                {fact.content}
+              </FontText>
+            </View>
+
+            {/* No "Read more" action, as requested */}
+            <View style={styles.cardFooter}>
+              <View style={styles.actions}>
+                <Pressable
+                  onPress={handleSave}
+                  style={[
+                    styles.actionButton,
+                    saved && styles.savedActionButton,
+                  ]}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={saved ? "bookmark" : "bookmark-outline"}
+                    size={rw(21)}
+                    color={saved ? colors.primary : colors.white}
+                  />
+                </Pressable>
+
+                <Pressable
+                  onPress={handleShare}
+                  style={styles.actionButton}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name="share-outline"
+                    size={rw(21)}
+                    color={colors.white}
+                  />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Small support message below the card */}
+        <View style={styles.discoveryNote}>
+          <View style={styles.discoveryIcon}>
+            <Ionicons
+              name="sparkles"
+              size={rw(17)}
+              color={colors.primary}
+            />
           </View>
 
+          <FontText variant="caption" style={styles.discoveryText}>
+            A new fact is waiting for you every day.
+          </FontText>
         </View>
       </View>
     </AnimatedScreen>
@@ -224,8 +318,8 @@ const HomeScreen = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: rw(20),
-    paddingTop: rh(20),
+    paddingHorizontal: rw(5),
+    paddingTop: rh(18),
     backgroundColor: colors.background,
   },
 
@@ -233,14 +327,47 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing.xxxl,
+    paddingHorizontal: spacing.xxxl,
     backgroundColor: colors.background,
+  },
+
+  emptyIcon: {
+    width: rw(62),
+    height: rw(62),
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: rw(31),
+    backgroundColor: "#FFF1D9",
+    marginBottom: rh(18),
+  },
+
+  emptyTitle: {
+    color: colors.text,
+    textAlign: "center",
   },
 
   emptyText: {
     color: colors.textSecondary,
     textAlign: "center",
+    lineHeight: rh(22),
     marginTop: spacing.sm,
+  },
+
+  emptyCategoryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: rw(8),
+    minHeight: rh(46),
+    borderRadius: rw(24),
+    paddingHorizontal: rw(18),
+    marginTop: rh(24),
+    backgroundColor: colors.primary,
+  },
+
+  emptyCategoryButtonText: {
+    color: colors.white,
+    fontFamily: "Inter-SemiBold",
   },
 
   header: {
@@ -249,64 +376,228 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
+  brandGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    paddingRight: rw(12),
+  },
+
+  logoMark: {
+    width: rw(45),
+    height: rw(45),
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: rw(15),
+    marginRight: rw(11),
+    backgroundColor: "#FFF0D5",
+  },
+
+  eyebrow: {
+    color: colors.textSecondary,
+    fontSize: rw(9),
+    letterSpacing: rw(1),
+    marginBottom: rh(2),
+  },
+
   greeting: {
     color: colors.text,
+    fontSize: rw(20),
+    lineHeight: rh(25),
   },
 
   categoryButton: {
-    width: rw(42),
-    height: rw(42),
-    borderRadius: rw(21),
+    width: rw(44),
+    height: rw(44),
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: rw(22),
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.surface,
   },
 
-  sectionTitle: {
-    marginTop: rh(32),
+  titleRow: {
+    marginTop: rh(34),
     marginBottom: rh(16),
   },
 
+  sectionTitle: {
+    color: colors.text,
+    fontSize: rw(31),
+    lineHeight: rh(39),
+  },
+
+  sectionTitleAccent: {
+    color: colors.primary,
+    fontSize: rw(31),
+    fontStyle: "italic",
+    fontFamily: "serif",
+  },
+
   factCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: rw(20),
-    padding: rw(20),
-    backgroundColor: colors.white,
+    minHeight: rh(420),
+    overflow: "hidden",
+    borderRadius: rw(28),
+    backgroundColor: "#1E1E1B",
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: rw(20),
+    shadowOffset: {
+      width: 0,
+      height: rh(12),
+    },
+    elevation: 8,
+  },
+
+  glowLarge: {
+    position: "absolute",
+    width: rw(330),
+    height: rw(330),
+    borderRadius: rw(165),
+    top: rh(-130),
+    right: rw(-115),
+    opacity: 0.82,
+    backgroundColor: "#A88F30",
+  },
+
+  glowSmall: {
+    position: "absolute",
+    width: rw(245),
+    height: rw(245),
+    borderRadius: rw(123),
+    top: rh(24),
+    left: rw(-165),
+    opacity: 0.18,
+    backgroundColor: "#EFE6A2",
+  },
+
+  cardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.24)",
+  },
+
+  cardContent: {
+    flex: 1,
+    justifyContent: "space-between",
+    padding: rw(22),
+  },
+
+  cardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
   categoryBadge: {
     alignSelf: "flex-start",
-    paddingHorizontal: rw(12),
-    paddingVertical: rh(6),
-    borderRadius: rw(20),
-    backgroundColor: "#EAF5FF",
+    borderRadius: rw(16),
+    paddingHorizontal: rw(13),
+    paddingVertical: rh(7),
+    backgroundColor: "rgba(255,255,255,0.17)",
   },
 
   categoryText: {
-    color: colors.primary,
+    color: colors.white,
     fontFamily: "Inter-SemiBold",
+    fontSize: rw(10),
+    letterSpacing: rw(1.1),
+  },
+
+  readTimeText: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: rw(12),
+  },
+
+  factMainContent: {
+    marginTop: rh(28),
+  },
+
+  factNumber: {
+    color: "#F2A537",
+    fontSize: rw(78),
+    lineHeight: rh(86),
+    fontWeight: "400",
+    fontStyle: "italic",
+    fontFamily: "serif",
+    letterSpacing: rw(-2),
+  },
+
+  factTitle: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter-SemiBold",
+    lineHeight: rh(22),
+    marginTop: rh(10),
   },
 
   factText: {
-    color: colors.text,
-    lineHeight: rh(27),
-    marginTop: rh(20),
+    color: colors.white,
+    fontSize: rw(22),
+    lineHeight: rh(32),
+    fontFamily: "serif",
+    marginTop: rh(16),
+  },
+
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: rh(22),
+  },
+
+  sourceWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: rw(6),
+    paddingRight: rw(10),
+  },
+
+  sourceText: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: rw(11),
   },
 
   actions: {
     flexDirection: "row",
-    justifyContent: "flex-end",
     alignItems: "center",
-    marginTop: rh(28),
-    gap: rw(18),
+    gap: rw(10),
   },
 
   actionButton: {
-    width: rw(36),
-    height: rw(36),
+    width: rw(43),
+    height: rw(43),
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: rw(22),
+    backgroundColor: "rgba(255,255,255,0.17)",
+  },
+
+  savedActionButton: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+  },
+
+  discoveryNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    marginTop: rh(22),
+    marginBottom: rh(12),
+  },
+
+  discoveryIcon: {
+    width: rw(28),
+    height: rw(28),
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: rw(14),
+    marginRight: rw(8),
+    backgroundColor: "#FFF0D5",
+  },
+
+  discoveryText: {
+    color: colors.textSecondary,
+    fontSize: rw(12),
   },
 });
 
