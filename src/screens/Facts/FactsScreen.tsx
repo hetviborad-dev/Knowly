@@ -1,7 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-} from "react";
+import React, { useEffect, useState } from 'react';
 
 import {
   ActivityIndicator,
@@ -11,24 +8,19 @@ import {
   Share,
   StyleSheet,
   View,
-} from "react-native";
+} from 'react-native';
 
-import Ionicons from "@react-native-vector-icons/ionicons";
+import LinearGradient from 'react-native-linear-gradient';
 
-import FontText from "../../components/common/FontText";
+import Ionicons from '@react-native-vector-icons/ionicons';
 
-import { colors } from "../../constant/colors";
+import FontText from '../../components/common/FontText';
 
-import {
-  rh,
-  rw,
-  rr,
-  rf,
-} from "../../constant/responsive";
+import { colors } from '../../constant/colors';
 
-import {
-  getSelectedCategories,
-} from "../../services/storageService";
+import { rh, rw, rr, rf } from '../../constant/responsive';
+
+import { getSelectedCategories } from '../../services/storageService';
 
 import {
   getFactInteractions,
@@ -36,10 +28,10 @@ import {
   unlikeFact,
   saveFact,
   unsaveFact,
-} from "../../services/factInteractionService";
+} from '../../services/factInteractionService';
 
-import { supabase } from "../../lib/supabase";
-
+import { supabase } from '../../lib/supabase';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Fact = {
   id: string;
@@ -54,58 +46,37 @@ type Fact = {
 
   created_at: string;
 
-  categories:
-    | {
-        id: string;
-        name: string;
-      }
-    | null;
+  categories: {
+    id: string;
+    name: string;
+  } | null;
 };
 
-
-const { height: SCREEN_HEIGHT } =
-  Dimensions.get("window");
-
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const FactsScreen = () => {
+  const [facts, setFacts] = useState<Fact[]>([]);
 
-  const [facts, setFacts] =
-    useState<Fact[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [likedFacts, setLikedFacts] = useState<string[]>([]);
 
-  const [likedFacts, setLikedFacts] =
-    useState<string[]>([]);
-
-  const [savedFacts, setSavedFacts] =
-    useState<string[]>([]);
-
+  const [savedFacts, setSavedFacts] = useState<string[]>([]);
 
   useEffect(() => {
     loadFacts();
   }, []);
 
-
-  // ============================================
-  // LOAD FACTS
-  // ============================================
-
   const loadFacts = async () => {
-
     try {
-
       setLoading(true);
 
-      const selectedCategories =
-        await getSelectedCategories();
-
-
-      // Load facts
+      const selectedCategories = await getSelectedCategories();
 
       let query = supabase
-        .from("facts")
-        .select(`
+        .from('facts')
+        .select(
+          `
           id,
           title,
           content,
@@ -116,674 +87,439 @@ const FactsScreen = () => {
             id,
             name
           )
-        `)
-        .order("created_at", {
+        `,
+        )
+        .order('created_at', {
           ascending: false,
         });
 
-
-      if (
-        selectedCategories.length > 0
-      ) {
-
-        query = query.in(
-          "category_id",
-          selectedCategories,
-        );
-
+      if (selectedCategories.length > 0) {
+        query = query.in('category_id', selectedCategories);
       }
 
-
-      const {
-        data,
-        error,
-      } = await query;
-
+      const { data, error } = await query;
 
       if (error) {
         throw error;
       }
 
+      setFacts((data as Fact[]) ?? []);
 
-      setFacts(
-        (data as Fact[]) ?? [],
-      );
+      const interactions = await getFactInteractions();
 
+      setLikedFacts(interactions.likedFactIds);
 
-      // Load likes + saves
-
-      const interactions =
-        await getFactInteractions();
-
-
-      setLikedFacts(
-        interactions.likedFactIds,
-      );
-
-      setSavedFacts(
-        interactions.savedFactIds,
-      );
-
+      setSavedFacts(interactions.savedFactIds);
     } catch (error) {
-
-      console.error(
-        "Failed to load facts:",
-        error,
-      );
-
+      console.error('Failed to load facts:', error);
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
-
-  // ============================================
-  // LIKE / UNLIKE
-  // ============================================
-
-  const toggleLike = async (
-    factId: string,
-  ) => {
-
-    const isLiked =
-      likedFacts.includes(factId);
-
-
-    // Update UI immediately
+  const toggleLike = async (factId: string) => {
+    const isLiked = likedFacts.includes(factId);
 
     setLikedFacts(previous => {
-
       if (isLiked) {
-
-        return previous.filter(
-          id => id !== factId,
-        );
-
+        return previous.filter(id => id !== factId);
       }
 
-      return [
-        ...previous,
-        factId,
-      ];
-
+      return [...previous, factId];
     });
 
-
     try {
-
       if (isLiked) {
-
         await unlikeFact(factId);
-
       } else {
-
         await likeFact(factId);
-
       }
-
     } catch (error) {
-
-      console.error(
-        "Failed to update like:",
-        error,
-      );
-
-
-      // Rollback UI
+      console.error('Failed to update like:', error);
 
       setLikedFacts(previous => {
-
         if (isLiked) {
-
-          return [
-            ...previous,
-            factId,
-          ];
-
+          return [...previous, factId];
         }
 
-        return previous.filter(
-          id => id !== factId,
-        );
-
+        return previous.filter(id => id !== factId);
       });
-
     }
-
   };
 
-
-  // ============================================
-  // SAVE / UNSAVE
-  // ============================================
-
-  const toggleSave = async (
-    factId: string,
-  ) => {
-
-    const isSaved =
-      savedFacts.includes(factId);
-
-
-    // Update UI immediately
+  const toggleSave = async (factId: string) => {
+    const isSaved = savedFacts.includes(factId);
 
     setSavedFacts(previous => {
-
       if (isSaved) {
-
-        return previous.filter(
-          id => id !== factId,
-        );
-
+        return previous.filter(id => id !== factId);
       }
 
-      return [
-        ...previous,
-        factId,
-      ];
-
+      return [...previous, factId];
     });
 
-
     try {
-
       if (isSaved) {
-
         await unsaveFact(factId);
-
       } else {
-
         await saveFact(factId);
-
       }
-
     } catch (error) {
-
-      console.error(
-        "Failed to update save:",
-        error,
-      );
-
-
-      // Rollback UI
+      console.error('Failed to update save:', error);
 
       setSavedFacts(previous => {
-
         if (isSaved) {
-
-          return [
-            ...previous,
-            factId,
-          ];
-
+          return [...previous, factId];
         }
 
-        return previous.filter(
-          id => id !== factId,
-        );
-
+        return previous.filter(id => id !== factId);
       });
-
     }
-
   };
 
-
-  // ============================================
-  // SHARE
-  // ============================================
-
-  const shareFact = async (
-    fact: Fact,
-  ) => {
-
+  const shareFact = async (fact: Fact) => {
     try {
-
       await Share.share({
         message: fact.content,
       });
-
     } catch (error) {
-
-      console.error(
-        "Share error:",
-        error,
-      );
-
+      console.error('Share error:', error);
     }
-
   };
 
+  const renderFact = ({ item }: { item: Fact }) => {
+    const isLiked = likedFacts.includes(item.id);
 
-  // ============================================
-  // FACT CARD
-  // ============================================
-
-  const renderFact = ({
-    item,
-  }: {
-    item: Fact;
-  }) => {
-
-    const isLiked =
-      likedFacts.includes(item.id);
-
-    const isSaved =
-      savedFacts.includes(item.id);
-
+    const isSaved = savedFacts.includes(item.id);
 
     return (
-
-      <View
-        style={
-          styles.factContainer
-        }
+      <LinearGradient
+        colors={['#6C6A3A', '#4F5030', '#303127', '#171816', '#090A0A']}
+        locations={[0, 0.22, 0.48, 0.72, 1]}
+        start={{ x: 0.95, y: 0 }}
+        end={{ x: 0.25, y: 1 }}
+        style={styles.factContainer}
       >
-
-        {/* FACT CONTENT */}
-
-        <View
-          style={
-            styles.factContent
-          }
-        >
-
-          {/* CATEGORY */}
-
+        <View style={styles.factContent}>
           {item.categories?.name && (
-
-            <View
-              style={
-                styles.categoryBadge
-              }
-            >
-
-              <FontText
-                variant="small"
-                style={
-                  styles.categoryText
-                }
-              >
+            <View style={styles.categoryBadge}>
+              <FontText variant="small" style={styles.categoryText}>
                 {item.categories.name}
               </FontText>
-
             </View>
-
           )}
 
-
-          {/* TITLE */}
-
-          <FontText
-            variant="heading1"
-            style={styles.title}
-          >
+          <FontText variant="heading1" style={styles.title}>
             {item.title}
           </FontText>
 
-
-          {/* CONTENT */}
-
-          <FontText
-            variant="body"
-            style={styles.content}
-          >
+          <FontText variant="body" style={styles.content}>
             {item.content}
           </FontText>
 
-
-          {/* SOURCE */}
-
           {item.source && (
-
-            <FontText
-              variant="small"
-              style={styles.source}
-            >
+            <FontText variant="small" style={styles.source}>
               Source: {item.source}
             </FontText>
-
           )}
-
         </View>
 
 
-        {/* RIGHT ACTIONS */}
-
-        <View
-          style={styles.actions}
-        >
-
-          {/* LIKE */}
+        <View style={styles.actions}>
 
           <Pressable
-            onPress={() =>
-              toggleLike(item.id)
-            }
-            style={
-              styles.actionButton
-            }
+            onPress={() => toggleLike(item.id)}
+            style={styles.actionButton}
           >
+            <View style={styles.actionIconCircle}>
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={rw(30)}
+                color={isLiked ? colors.error : '#F5F3EC'}
+              />
+            </View>
 
-            <Ionicons
-              name={
-                isLiked
-                  ? "heart"
-                  : "heart-outline"
-              }
-              size={rw(30)}
-              color={
-                isLiked
-                  ? colors.error
-                  : colors.text
-              }
-            />
-
-            <FontText
-              variant="small"
-              style={
-                styles.actionText
-              }
-            >
+            <FontText variant="small" style={styles.actionText}>
               Like
             </FontText>
-
           </Pressable>
 
 
-          {/* SAVE */}
-
           <Pressable
-            onPress={() =>
-              toggleSave(item.id)
-            }
-            style={
-              styles.actionButton
-            }
+            onPress={() => toggleSave(item.id)}
+            style={styles.actionButton}
           >
+            <View style={styles.actionIconCircle}>
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={rw(30)}
+                color={isSaved ? '#F5A63D' : '#F5F3EC'}
+              />
+            </View>
 
-            <Ionicons
-              name={
-                isSaved
-                  ? "bookmark"
-                  : "bookmark-outline"
-              }
-              size={rw(30)}
-              color={
-                isSaved
-                  ? colors.primary
-                  : colors.text
-              }
-            />
-
-            <FontText
-              variant="small"
-              style={
-                styles.actionText
-              }
-            >
+            <FontText variant="small" style={styles.actionText}>
               Save
             </FontText>
-
           </Pressable>
 
-
-          {/* SHARE */}
 
           <Pressable
-            onPress={() =>
-              shareFact(item)
-            }
-            style={
-              styles.actionButton
-            }
+            onPress={() => shareFact(item)}
+            style={styles.actionButton}
           >
+            <View style={styles.actionIconCircle}>
+              <Ionicons name="share-outline" size={rw(30)} color="#F5F3EC" />
+            </View>
 
-            <Ionicons
-              name="share-outline"
-              size={rw(30)}
-              color={colors.text}
-            />
-
-            <FontText
-              variant="small"
-              style={
-                styles.actionText
-              }
-            >
+            <FontText variant="small" style={styles.actionText}>
               Share
             </FontText>
-
           </Pressable>
-
         </View>
-
-      </View>
-
+      </LinearGradient>
     );
-
   };
 
 
-  // ============================================
-  // LOADING
-  // ============================================
-
   if (loading) {
-
     return (
-
-      <View
-        style={
-          styles.loadingContainer
-        }
+      <LinearGradient
+        colors={['#5F603B', '#262820', '#090A0A']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.loadingContainer}
       >
-
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-        />
-
-      </View>
-
+        <ActivityIndicator size="large" color="#F5A63D" />
+      </LinearGradient>
     );
-
   }
 
 
-  // ============================================
-  // EMPTY
-  // ============================================
-
   if (facts.length === 0) {
-
     return (
-
-      <View
-        style={
-          styles.emptyContainer
-        }
+      <LinearGradient
+        colors={['#5F603B', '#262820', '#090A0A']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.emptyContainer}
       >
+        <Ionicons name="bulb-outline" size={rw(48)} color="#CBC9C1" />
 
-        <Ionicons
-          name="bulb-outline"
-          size={rw(48)}
-          color={colors.textMuted}
-        />
-
-        <FontText
-          variant="heading2"
-          style={
-            styles.emptyTitle
-          }
-        >
+        <FontText variant="heading2" style={styles.emptyTitle}>
           No facts yet
         </FontText>
 
-        <FontText
-          variant="body"
-          style={
-            styles.emptyText
-          }
-        >
-          We couldn't find facts for
-          your selected categories.
+        <FontText variant="body" style={styles.emptyText}>
+          We couldn't find facts for your selected categories.
         </FontText>
-
-      </View>
-
+      </LinearGradient>
     );
-
   }
-
 
   // ============================================
   // SCREEN
   // ============================================
 
   return (
-
-    <View
-      style={styles.container}
-    >
-
+    <SafeAreaView edges={['top']} style={styles.container}>
       <FlatList
         data={facts}
         keyExtractor={item => item.id}
         renderItem={renderFact}
         pagingEnabled
-        showsVerticalScrollIndicator={
-          false
-        }
+        showsVerticalScrollIndicator={false}
         decelerationRate="fast"
         snapToAlignment="start"
         bounces={false}
+        removeClippedSubviews
       />
-
-    </View>
-
+    </SafeAreaView>
   );
-
 };
 
-
 const styles = StyleSheet.create({
+  // ============================================
+  // CONTAINER
+  // ============================================
 
   container: {
     flex: 1,
-    backgroundColor:
-      colors.background,
+    backgroundColor: '#090A0A',
   },
 
+  // ============================================
+  // LOADING
+  // ============================================
 
   loadingContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      colors.background,
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
   },
 
+  // ============================================
+  // FACT
+  // ============================================
 
   factContainer: {
     height: SCREEN_HEIGHT,
-    paddingHorizontal: rw(22),
-    paddingTop: rh(30),
-    paddingBottom: rh(35),
-    position: "relative",
-  },
 
+    paddingHorizontal: rw(22),
+
+    paddingTop: rh(30),
+
+    paddingBottom: rh(35),
+
+    position: 'relative',
+  },
 
   factContent: {
     flex: 1,
+
     paddingRight: rw(65),
   },
 
+  // ============================================
+  // CATEGORY
+  // ============================================
 
   categoryBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: rw(12),
-    paddingVertical: rh(6),
-    backgroundColor: "#EAF5FF",
-    borderRadius: rr(20),
-    marginBottom: rh(20),
-  },
+    alignSelf: 'flex-start',
 
+    paddingHorizontal: rw(12),
+
+    paddingVertical: rh(6),
+
+    backgroundColor: 'rgba(30, 31, 29, 0.45)',
+
+    borderRadius: rr(20),
+
+    marginBottom: rh(20),
+
+    borderWidth: 1,
+
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
 
   categoryText: {
-    color: colors.primary,
-    fontFamily: "Inter-SemiBold",
+    color: '#F5F3EC',
+
+    fontFamily: 'Inter-SemiBold',
   },
 
+  // ============================================
+  // TITLE
+  // ============================================
 
   title: {
-    color: colors.text,
+    color: '#F7F5EF',
+
     marginBottom: rh(18),
   },
 
+  // ============================================
+  // CONTENT
+  // ============================================
 
   content: {
-    color: colors.textSecondary,
+    color: '#F0EEE8',
+
     lineHeight: rf(27),
   },
 
+  // ============================================
+  // SOURCE
+  // ============================================
 
   source: {
-    color: colors.textMuted,
+    color: '#D0CEC8',
+
     marginTop: rh(18),
+
+    opacity: 0.8,
   },
 
+  // ============================================
+  // ACTIONS
+  // ============================================
 
   actions: {
-    position: "absolute",
+    position: 'absolute',
+
     right: rw(14),
-    bottom: rh(100),
-    alignItems: "center",
-    justifyContent: "flex-end",
+
+    bottom: rh(150),
+
+    alignItems: 'center',
+
+    justifyContent: 'flex-end',
+
     gap: rh(25),
   },
 
-
   actionButton: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
     width: rw(52),
   },
 
+  actionIconCircle: {
+    width: rw(52),
+
+    height: rw(52),
+
+    borderRadius: rr(26),
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    backgroundColor: 'rgba(34, 35, 34, 0.70)',
+
+    borderWidth: 1,
+
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+  },
 
   actionText: {
-    color: colors.textSecondary,
+    color: '#F0EEE8',
+
     fontSize: rf(11),
+
     marginTop: rh(4),
   },
 
+  // ============================================
+  // EMPTY
+  // ============================================
 
   emptyContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
     paddingHorizontal: rw(40),
-    backgroundColor:
-      colors.background,
   },
 
-
   emptyTitle: {
-    color: colors.text,
+    color: '#F7F5EF',
+
     marginTop: rh(15),
   },
 
-
   emptyText: {
-    color: colors.textSecondary,
-    textAlign: "center",
+    color: '#D0CEC8',
+
+    textAlign: 'center',
+
     marginTop: rh(8),
   },
-
 });
-
 
 export default FactsScreen;

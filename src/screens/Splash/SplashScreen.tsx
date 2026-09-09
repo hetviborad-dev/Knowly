@@ -1,39 +1,21 @@
-import React, { useEffect, useRef } from "react";
-import {
-  Animated,
-  StyleSheet,
-  View,
-} from "react-native";
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 
-import type {
-  NativeStackScreenProps,
-} from "@react-navigation/native-stack";
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { supabase } from '../../lib/supabase';
 
-import { supabase } from "../../lib/supabase";
+import type { RootStackParamList } from '../../types/navigation';
 
-import type {
-  RootStackParamList,
-} from "../../types/navigation";
+import { colors } from '../../constant/colors';
+import { typography } from '../../constant/typography';
+import { getOnboardingStep } from '../../services/storageService';
 
-import { colors } from "../../constant/colors";
-import { typography } from "../../constant/typography";
-import { getOnboardingStep } from "../../services/storageService";
+type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
-type Props = NativeStackScreenProps<
-  RootStackParamList,
-  "Splash"
->;
+const SplashScreen = ({ navigation }: Props) => {
+  const opacity = useRef(new Animated.Value(0)).current;
 
-const SplashScreen = ({
-  navigation,
-}: Props) => {
-  const opacity = useRef(
-    new Animated.Value(0),
-  ).current;
-
-  const scale = useRef(
-    new Animated.Value(0.8),
-  ).current;
+  const scale = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -50,70 +32,60 @@ const SplashScreen = ({
       }),
     ]).start();
 
-const checkSession = async () => {
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const checkSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-    console.log(
-      "KNOWLY SPLASH SESSION:",
-      session,
-    );
+        console.log('KNOWLY SPLASH SESSION:', session);
 
-    // --------------------------------
-    // USER ALREADY LOGGED IN
-    // --------------------------------
+        // --------------------------------
+        // USER ALREADY LOGGED IN
+        // --------------------------------
 
-    if (session) {
-      navigation.replace("MainTabs");
-      return;
-    }
+        if (session) {
+          navigation.replace('MainTabs');
+          return;
+        }
 
-    // --------------------------------
-    // USER NOT LOGGED IN
-    // RESUME ONBOARDING
-    // --------------------------------
+        // --------------------------------
+        // USER NOT LOGGED IN
+        // RESUME ONBOARDING
+        // --------------------------------
 
-    const onboardingStep =
-      await getOnboardingStep();
+        const onboardingStep = await getOnboardingStep();
 
-    console.log(
-      "KNOWLY ONBOARDING STEP:",
-      onboardingStep,
-    );
+        console.log('KNOWLY ONBOARDING STEP:', onboardingStep);
 
-    switch (onboardingStep) {
-      case "NAME":
-        navigation.replace("SelectCategories");
-        break;
+        switch (onboardingStep) {
+          case 'NAME':
+            navigation.replace('SelectCategories');
+            break;
 
-      case "CATEGORIES":
-        navigation.replace("Auth");
-        break;
+          case 'CATEGORIES':
+            navigation.replace('Auth');
+            break;
 
-      case "AUTH":
-        navigation.replace("Notifications");
-        break;
+          case 'AUTH':
+            navigation.replace('Notifications');
+            break;
 
-      case "NOTIFICATIONS":
-        navigation.replace("Welcome");
-        break;
+          case 'NOTIFICATIONS':
+            navigation.replace('Welcome');
+            break;
 
-      case "WELCOME":
-      default:
-        navigation.replace("Welcome");
-        break;
-    }
-  } catch (error) {
-    console.error(
-      "Failed to check session:",
-      error,
-    );
+          case 'WELCOME':
+          default:
+            navigation.replace('Welcome');
+            break;
+        }
+      } catch (error) {
+        console.error('Failed to check session:', error);
 
-    navigation.replace("Welcome");
-  }
-};
+        navigation.replace('Welcome');
+      }
+    };
 
     const timer = setTimeout(() => {
       checkSession();
@@ -122,11 +94,7 @@ const checkSession = async () => {
     return () => {
       clearTimeout(timer);
     };
-  }, [
-    navigation,
-    opacity,
-    scale,
-  ]);
+  }, [navigation, opacity, scale]);
 
   return (
     <View style={styles.container}>
@@ -140,18 +108,10 @@ const checkSession = async () => {
         ]}
       >
         <View style={styles.logoCircle}>
-          <Animated.Text
-            style={styles.logoText}
-          >
-            K
-          </Animated.Text>
+          <Animated.Text style={styles.logoText}>K</Animated.Text>
         </View>
 
-        <Animated.Text
-          style={styles.appName}
-        >
-          Knowly
-        </Animated.Text>
+        <Animated.Text style={styles.appName}>Knowly</Animated.Text>
       </Animated.View>
     </View>
   );
@@ -163,12 +123,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   logoContainer: {
-    alignItems: "center",
+    alignItems: 'center',
   },
 
   logoCircle: {
@@ -176,22 +136,21 @@ const styles = StyleSheet.create({
     height: 82,
     borderRadius: 41,
     backgroundColor: colors.white,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   logoText: {
     fontSize: 42,
-    fontWeight: "800",
+    fontWeight: '800',
     color: colors.primary,
   },
 
   appName: {
     marginTop: 16,
     fontSize: 32,
-    fontWeight: "800",
+    fontWeight: '800',
     color: colors.white,
-    fontFamily:
-      typography.heading1.fontFamily,
+    fontFamily: typography.heading1.fontFamily,
   },
 });
