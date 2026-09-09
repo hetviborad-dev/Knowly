@@ -1,8 +1,4 @@
-import React, {
-  useCallback,
-  useState,
-} from "react";
-
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,706 +7,354 @@ import {
   Share,
   StyleSheet,
   View,
-} from "react-native";
+  useWindowDimensions,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import Ionicons from '@react-native-vector-icons/ionicons';
+import LinearGradient from 'react-native-linear-gradient';
 
-import {
-  useFocusEffect,
-} from "@react-navigation/native";
-
-import Ionicons from "@react-native-vector-icons/ionicons";
-
-import FontText from "../../components/common/FontText";
-
-import { colors } from "../../constant/colors";
-
-import {
-  rh,
-  rw,
-  rr,
-  rf,
-} from "../../constant/responsive";
-
-import { supabase } from "../../lib/supabase";
-
-import {
-  unsaveFact,
-} from "../../services/factInteractionService";
-
+import FontText from '../../components/common/FontText';
+import { colors } from '../../constant/colors';
+import { rh, rw, rr, rf } from '../../constant/responsive';
+import { supabase } from '../../lib/supabase';
+import { unsaveFact } from '../../services/factInteractionService';
 
 type SavedFact = {
   id: string;
-
   title: string;
-
   content: string;
-
   image_url: string | null;
-
   source: string | null;
-
   created_at: string;
-
-  categories:
-    | {
-        id: string;
-        name: string;
-      }
-    | null;
+  categories: {
+    id: string;
+    name: string;
+  } | null;
 };
 
+const FALLBACK_GRADIENTS = [
+  ['#93B5FF', '#4169B8'],
+  ['#F6C16F', '#E68232'],
+  ['#B5A0F6', '#6851B7'],
+  ['#82D4C7', '#348E88'],
+];
 
 const SavedScreen = () => {
-
-  const [facts, setFacts] =
-    useState<SavedFact[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [removingId, setRemovingId] =
-    useState<string | null>(null);
-
-
-  // ============================================
-  // LOAD SAVED FACTS
-  // ============================================
+  const { width } = useWindowDimensions();
+  const [facts, setFacts] = useState<SavedFact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const loadSavedFacts = async () => {
-
     try {
-
       setLoading(true);
-
-
       const {
-        data: {
-          user,
-        },
+        data: { user },
       } = await supabase.auth.getUser();
-
 
       if (!user) {
         setFacts([]);
         return;
       }
 
-
-      const {
-        data,
-        error,
-      } = await supabase
-
-        .from("saved_facts")
-
-        .select(`
-          fact_id,
-          created_at,
-          facts (
-            id,
-            title,
-            content,
-            image_url,
-            source,
+      const { data, error } = await supabase
+        .from('saved_facts')
+        .select(
+          `
+            fact_id,
             created_at,
-            categories (
+            facts (
               id,
-              name
+              title,
+              content,
+              image_url,
+              source,
+              created_at,
+              categories (
+                id,
+                name
+              )
             )
-          )
-        `)
+          `,
+        )
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-        .eq("user_id", user.id)
+      if (error) throw error;
 
-        .order("created_at", {
-          ascending: false,
-        });
-
-
-      if (error) {
-        throw error;
-      }
-
-
-      const savedFacts =
-        (data ?? [])
-          .map(item => item.facts)
-          .filter(Boolean) as SavedFact[];
-
+      const savedFacts = (data ?? [])
+        .map(item => item.facts)
+        .filter(Boolean) as SavedFact[];
 
       setFacts(savedFacts);
-
     } catch (error) {
-
-      console.error(
-        "Failed to load saved facts:",
-        error,
-      );
-
+      console.error('Failed to load saved facts:', error);
     } finally {
-
       setLoading(false);
-
     }
-
   };
-
-
-  // ============================================
-  // LOAD WHEN TAB OPENS
-  // ============================================
 
   useFocusEffect(
     useCallback(() => {
-
       loadSavedFacts();
-
     }, []),
   );
 
-
-  // ============================================
-  // PULL TO REFRESH
-  // ============================================
-
   const handleRefresh = async () => {
-
     try {
-
       setRefreshing(true);
-
       await loadSavedFacts();
-
     } finally {
-
       setRefreshing(false);
-
     }
-
   };
 
-
-  // ============================================
-  // UNSAVE
-  // ============================================
-
-  const handleUnsave = async (
-    factId: string,
-  ) => {
-
+  const handleUnsave = async (factId: string) => {
     try {
-
       setRemovingId(factId);
-
-
       await unsaveFact(factId);
-
-
-      setFacts(previous =>
-        previous.filter(
-          fact => fact.id !== factId,
-        ),
-      );
-
+      setFacts(previous => previous.filter(fact => fact.id !== factId));
     } catch (error) {
-
-      console.error(
-        "Failed to unsave fact:",
-        error,
-      );
-
+      console.error('Failed to unsave fact:', error);
     } finally {
-
       setRemovingId(null);
-
     }
-
   };
 
-
-  // ============================================
-  // SHARE
-  // ============================================
-
-  const shareFact = async (
-    fact: SavedFact,
-  ) => {
-
+  const shareFact = async (fact: SavedFact) => {
     try {
-
       await Share.share({
-        message: fact.content,
+        title: fact.title,
+        message: `${fact.title}\n\n${fact.content}`,
       });
-
     } catch (error) {
-
-      console.error(
-        "Share error:",
-        error,
-      );
-
+      console.error('Share error:', error);
     }
-
   };
 
-
-  // ============================================
-  // CARD
-  // ============================================
-
-  const renderFact = ({
-    item,
-  }: {
-    item: SavedFact;
-  }) => {
-
-    const isRemoving =
-      removingId === item.id;
-
+  const renderFact = ({ item, index }: { item: SavedFact; index: number }) => {
+    const isRemoving = removingId === item.id;
+    const gradient = FALLBACK_GRADIENTS[index % FALLBACK_GRADIENTS.length];
 
     return (
+      <View style={styles.cardWrapper}>
+        <LinearGradient
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.card}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.categoryRow}>
+              <Ionicons
+                name="hardware-chip-outline"
+                size={rw(17)}
+                color="#17233D"
+              />
+              <FontText variant="small" style={styles.categoryText}>
+                {(item.categories?.name || 'GENERAL').toUpperCase()}
+              </FontText>
+            </View>
 
-      <View
-        style={styles.card}
-      >
-
-        {/* CATEGORY */}
-
-        {item.categories?.name && (
-
-          <View
-            style={
-              styles.categoryBadge
-            }
-          >
-
-            <FontText
-              variant="small"
-              style={
-                styles.categoryText
-              }
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Remove saved fact"
+              onPress={() => handleUnsave(item.id)}
+              disabled={isRemoving}
+              hitSlop={12}
+              style={styles.bookmarkButton}
             >
-              {item.categories.name}
-            </FontText>
-
+              {isRemoving ? (
+                <ActivityIndicator size="small" color="#111827" />
+              ) : (
+                <Ionicons name="bookmark" size={rw(22)} color="#111827" />
+              )}
+            </Pressable>
           </View>
 
-        )}
-
-
-        {/* TITLE */}
-
-        <FontText
-          variant="heading2"
-          style={styles.title}
-        >
-          {item.title}
-        </FontText>
-
-
-        {/* CONTENT */}
-
-        <FontText
-          variant="body"
-          style={styles.content}
-        >
-          {item.content}
-        </FontText>
-
-
-        {/* SOURCE */}
-
-        {item.source && (
-
-          <FontText
-            variant="small"
-            style={styles.source}
-          >
-            Source: {item.source}
-          </FontText>
-
-        )}
-
-
-        {/* ACTIONS */}
-
-        <View
-          style={styles.actions}
-        >
-
-          {/* UNSAVE */}
-
-          <Pressable
-            onPress={() =>
-              handleUnsave(item.id)
-            }
-            disabled={isRemoving}
-            style={
-              styles.actionButton
-            }
-          >
-
-            {isRemoving ? (
-
-              <ActivityIndicator
-                size="small"
-                color={
-                  colors.primary
-                }
-              />
-
-            ) : (
-
-              <Ionicons
-                name="bookmark"
-                size={rw(23)}
-                color={
-                  colors.primary
-                }
-              />
-
-            )}
-
+          <Pressable onPress={() => shareFact(item)} style={styles.factBody}>
             <FontText
-              variant="small"
-              style={
-                styles.actionText
-              }
+              variant="heading2"
+              numberOfLines={4}
+              style={styles.factTitle}
             >
-              Unsave
+              {item.title}
             </FontText>
-
           </Pressable>
-
-
-          {/* SHARE */}
-
-          <Pressable
-            onPress={() =>
-              shareFact(item)
-            }
-            style={
-              styles.actionButton
-            }
-          >
-
-            <Ionicons
-              name="share-outline"
-              size={rw(23)}
-              color={
-                colors.text
-              }
-            />
-
-            <FontText
-              variant="small"
-              style={
-                styles.actionText
-              }
-            >
-              Share
-            </FontText>
-
-          </Pressable>
-
-        </View>
-
+        </LinearGradient>
       </View>
-
     );
-
   };
 
-
-  // ============================================
-  // LOADING
-  // ============================================
-
   if (loading) {
-
     return (
-
-      <View
-        style={
-          styles.loadingContainer
-        }
-      >
-
-        <ActivityIndicator
-          size="large"
-          color={
-            colors.primary
-          }
-        />
-
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
-
     );
-
   }
-
-
-  // ============================================
-  // EMPTY
-  // ============================================
-
-  if (facts.length === 0) {
-
-    return (
-
-      <View
-        style={
-          styles.emptyContainer
-        }
-      >
-
-        <Ionicons
-          name="bookmark-outline"
-          size={rw(52)}
-          color={
-            colors.textMuted
-          }
-        />
-
-        <FontText
-          variant="heading2"
-          style={
-            styles.emptyTitle
-          }
-        >
-          No saved facts
-        </FontText>
-
-        <FontText
-          variant="body"
-          style={
-            styles.emptyText
-          }
-        >
-          Facts you save will appear
-          here.
-        </FontText>
-
-      </View>
-
-    );
-
-  }
-
-
-  // ============================================
-  // SCREEN
-  // ============================================
 
   return (
-
-    <View
-      style={styles.container}
-    >
-
-      <View
-        style={styles.header}
-      >
-
-        <FontText
-          variant="heading1"
-          style={styles.headerTitle}
-        >
-          Saved
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <FontText variant="small" style={styles.savedLabel}>
+          {facts.length} SAVED
         </FontText>
-
-        <FontText
-          variant="small"
-          style={styles.count}
-        >
-          {facts.length}{" "}
-          {facts.length === 1
-            ? "fact"
-            : "facts"}
+        <FontText variant="heading1" style={styles.headerTitle}>
+          Your
         </FontText>
-
+        <FontText variant="heading1" style={styles.headerAccent}>
+          library
+        </FontText>
       </View>
 
-
-      <FlatList
-        data={facts}
-        keyExtractor={item =>
-          item.id
-        }
-        renderItem={
-          renderFact
-        }
-        contentContainerStyle={
-          styles.listContent
-        }
-        showsVerticalScrollIndicator={
-          false
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={
-              refreshing
-            }
-            onRefresh={
-              handleRefresh
-            }
-            tintColor={
-              colors.primary
-            }
+      {facts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons
+            name="bookmark-outline"
+            size={rw(52)}
+            color={colors.textMuted}
           />
-        }
-      />
-
+          <FontText variant="heading2" style={styles.emptyTitle}>
+            No saved facts
+          </FontText>
+          <FontText variant="body" style={styles.emptyText}>
+            Facts you save will appear here.
+          </FontText>
+        </View>
+      ) : (
+        <FlatList
+          data={facts}
+          keyExtractor={item => item.id}
+          renderItem={renderFact}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
+        />
+      )}
     </View>
-
   );
-
 };
 
-
 const styles = StyleSheet.create({
-
   container: {
     flex: 1,
-    backgroundColor:
-      colors.background,
+    backgroundColor: '#F8F6EF',
   },
-
-
   loadingContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8F6EF',
   },
-
-
   header: {
-    paddingHorizontal: rw(20),
-    paddingTop: rh(20),
-    paddingBottom: rh(12),
+    paddingHorizontal: rw(30),
+    paddingTop: rh(50),
+    paddingBottom: rh(20),
   },
-
-
+  savedLabel: {
+    color: '#898886',
+    letterSpacing: rf(4),
+    fontSize: rf(13),
+    marginBottom: rh(18),
+    fontFamily: 'serif',
+  },
   headerTitle: {
-    color: colors.text,
+    color: '#111111',
+    fontSize: rf(40),
+    lineHeight: rf(40),
+    fontFamily: 'inter',
   },
-
-
-  count: {
-    color: colors.textMuted,
-    marginTop: rh(4),
+  headerAccent: {
+    color: '#E9A03F',
+    fontSize: rf(40),
+    lineHeight: rf(60),
+    fontFamily: 'serif',
   },
-
-
   listContent: {
-    paddingHorizontal: rw(16),
+    paddingHorizontal: rw(20),
     paddingBottom: rh(30),
   },
-
-
+  cardWrapper: {
+    borderRadius: rr(27),
+    marginBottom: rh(22),
+    shadowColor: '#6D7890',
+    shadowOffset: { width: 0, height: rh(12) },
+    shadowOpacity: 0.22,
+    shadowRadius: rr(18),
+    elevation: 7,
+  },
   card: {
-    backgroundColor:
-      colors.white,
-    borderRadius: rr(18),
-    padding: rw(18),
-    marginBottom: rh(14),
-    borderWidth: 1,
-    borderColor:
-      colors.border,
+    borderRadius: rr(27),
+    paddingHorizontal: rw(20),
+    paddingTop: rh(15),
+    paddingBottom: rh(15),
+    overflow: 'hidden',
   },
-
-
-  categoryBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: rw(10),
-    paddingVertical: rh(5),
-    backgroundColor:
-      "#EAF5FF",
-    borderRadius: rr(20),
-    marginBottom: rh(12),
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-
-
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rw(10),
+  },
   categoryText: {
-    color: colors.primary,
-    fontFamily:
-      "Inter-SemiBold",
+    color: '#17233D',
+    fontSize: rf(13),
+    letterSpacing: rf(2.4),
+    fontFamily: 'Inter-SemiBold',
   },
-
-
-  title: {
-    color: colors.text,
-    marginBottom: rh(10),
+  bookmarkButton: {
+    width: rw(48),
+    height: rw(48),
+    borderRadius: rw(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(21, 47, 101, 0.18)',
   },
-
-
-  content: {
-    color:
-      colors.textSecondary,
+  factBody: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingTop: rh(15),
+  },
+  factTitle: {
+    color: '#10182D',
+    fontSize: rf(16),
+    lineHeight: rf(20),
+    fontFamily: 'serif',
+  },
+  factContent: {
+    color: '#17233D',
+    opacity: 0.9,
+    marginTop: rh(11),
     lineHeight: rf(24),
   },
-
-
-  source: {
-    color:
-      colors.textMuted,
-    marginTop: rh(12),
-  },
-
-
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginTop: rh(18),
-    gap: rw(20),
-  },
-
-
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: rw(6),
-    minWidth: rw(70),
-    justifyContent: "center",
-  },
-
-
-  actionText: {
-    color:
-      colors.textSecondary,
-    fontSize: rf(12),
-  },
-
-
   emptyContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: rw(40),
-    backgroundColor:
-      colors.background,
   },
-
-
   emptyTitle: {
     color: colors.text,
     marginTop: rh(15),
+    fontFamily: 'serif',
   },
-
-
   emptyText: {
-    color:
-      colors.textSecondary,
-    textAlign: "center",
+    color: colors.textSecondary,
+    textAlign: 'center',
     marginTop: rh(8),
   },
-
 });
-
 
 export default SavedScreen;

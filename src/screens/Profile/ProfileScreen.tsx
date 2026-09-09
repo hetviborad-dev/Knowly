@@ -49,6 +49,7 @@ import type {
   RootStackParamList,
 } from "../../types/navigation";
 
+
 type ProfileNavigationProp =
   NativeStackNavigationProp<
     RootStackParamList
@@ -63,6 +64,7 @@ type Profile = {
   email: string | null;
 };
 
+
 const ProfileScreen = ({
   navigation,
 }: ProfileScreenProps) => {
@@ -73,8 +75,10 @@ const ProfileScreen = ({
     null,
   );
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
   const [
     loggingOut,
@@ -88,17 +92,21 @@ const ProfileScreen = ({
 
   const slideAnimation =
     useRef(
-      new Animated.Value(20),
+      new Animated.Value(18),
     ).current;
+
 
   useEffect(() => {
     loadProfile();
   }, []);
 
+
   const loadProfile = async () => {
     try {
       const {
-        data: { user },
+        data: {
+          user,
+        },
         error: userError,
       } =
         await supabase.auth.getUser();
@@ -146,7 +154,7 @@ const ProfileScreen = ({
           fadeAnimation,
           {
             toValue: 1,
-            duration: 500,
+            duration: 450,
             useNativeDriver: true,
           },
         ),
@@ -155,20 +163,38 @@ const ProfileScreen = ({
           slideAnimation,
           {
             toValue: 0,
-            duration: 500,
+            duration: 450,
             useNativeDriver: true,
           },
         ),
       ]).start();
+
     } catch (error) {
       console.error(
         "Failed to load profile:",
         error,
       );
+
+      setProfile({
+        username:
+          "Knowledge Explorer",
+        email: "",
+      });
+
+      Animated.timing(
+        fadeAnimation,
+        {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        },
+      ).start();
+
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleLogout = () => {
     Alert.alert(
@@ -188,6 +214,7 @@ const ProfileScreen = ({
     );
   };
 
+
   const logout = async () => {
     try {
       setLoggingOut(true);
@@ -206,18 +233,12 @@ const ProfileScreen = ({
         return;
       }
 
-      /*
-       * Clear local onboarding data
-       */
       await clearOnboardingData();
 
-      /*
-       * Completely leave
-       * authenticated navigation.
-       */
       navigation.replace(
         "Welcome",
       );
+
     } catch (error) {
       console.error(
         "Logout error:",
@@ -228,10 +249,12 @@ const ProfileScreen = ({
         "Logout failed",
         "Something went wrong. Please try again.",
       );
+
     } finally {
       setLoggingOut(false);
     }
   };
+
 
   if (loading) {
     return (
@@ -240,25 +263,43 @@ const ProfileScreen = ({
           styles.loadingContainer
         }
       >
+        <View
+          style={
+            styles.loadingIcon
+          }
+        >
+          <Ionicons
+            name="sparkles"
+            size={rw(22)}
+            color={colors.primary}
+          />
+        </View>
+
         <ActivityIndicator
           size="small"
           color={colors.primary}
+          style={
+            styles.loadingIndicator
+          }
         />
       </View>
     );
   }
+
 
   const username =
     profile?.username?.trim() ||
     "Knowledge Explorer";
 
   const email =
-    profile?.email ?? "";
+    profile?.email?.trim() ||
+    "";
 
   const avatarLetter =
     username
       .charAt(0)
       .toUpperCase();
+
 
   return (
     <ScrollView
@@ -286,9 +327,61 @@ const ProfileScreen = ({
           },
         ]}
       >
-        {/* HEADER */}
 
-        <View style={styles.header}>
+        {/* =========================
+            TOP HEADER
+        ========================== */}
+
+        <View
+          style={styles.topHeader}
+        >
+          <View>
+            <FontText
+              variant="caption"
+              style={
+                styles.headerEyebrow
+              }
+            >
+              KNOWLY
+            </FontText>
+
+            <FontText
+              variant="heading1"
+              style={
+                styles.headerTitle
+              }
+            >
+              Profile
+            </FontText>
+          </View>
+
+          <View
+            style={
+              styles.headerSparkle
+            }
+          >
+            <Ionicons
+              name="sparkles"
+              size={rw(20)}
+              color={colors.primary}
+            />
+          </View>
+        </View>
+
+
+        {/* =========================
+            PROFILE CARD
+        ========================== */}
+
+        <View
+          style={styles.profileCard}
+        >
+          <View
+            style={
+              styles.profileCardGlow
+            }
+          />
+
           <View
             style={styles.avatar}
           >
@@ -302,50 +395,82 @@ const ProfileScreen = ({
           </View>
 
           <View
-            style={styles.userInfo}
+            style={styles.profileInfo}
           >
             <FontText
               variant="caption"
-              style={styles.eyebrow}
+              style={
+                styles.profileLabel
+              }
             >
-              YOUR KNOWLY
+              YOUR KNOWLY PROFILE
             </FontText>
 
             <FontText
               variant="heading2"
-              style={styles.name}
+              style={
+                styles.profileName
+              }
+              numberOfLines={1}
             >
               {username}
             </FontText>
 
-            <FontText
-              variant="small"
-              style={styles.email}
-            >
-              {email}
-            </FontText>
+            {email ? (
+              <FontText
+                variant="small"
+                style={
+                  styles.profileEmail
+                }
+                numberOfLines={1}
+              >
+                {email}
+              </FontText>
+            ) : null}
           </View>
         </View>
 
-        {/* PREFERENCES */}
+
+        {/* =========================
+            PERSONALIZE
+        ========================== */}
 
         <View
           style={styles.section}
         >
-          <FontText
-            variant="heading2"
-            style={
-              styles.sectionTitle
-            }
-          >
-            Preferences
-          </FontText>
-
           <View
             style={
-              styles.settingsCard
+              styles.sectionHeader
             }
           >
+            <View>
+              <FontText
+                variant="heading2"
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Personalize
+              </FontText>
+
+              <FontText
+                variant="small"
+                style={
+                  styles.sectionSubtitle
+                }
+              >
+                Make Knowly more you
+              </FontText>
+            </View>
+          </View>
+
+
+          <View
+            style={styles.settingsCard}
+          >
+
+            {/* CATEGORIES */}
+
             <Pressable
               onPress={() =>
                 navigation.navigate(
@@ -359,7 +484,6 @@ const ProfileScreen = ({
                 pressed,
               }) => [
                 styles.settingRow,
-
                 pressed &&
                   styles.settingPressed,
               ]}
@@ -371,7 +495,7 @@ const ProfileScreen = ({
                 ]}
               >
                 <Ionicons
-                  name="options-outline"
+                  name="grid-outline"
                   size={rw(21)}
                   color={
                     colors.primary
@@ -390,7 +514,7 @@ const ProfileScreen = ({
                     styles.settingTitle
                   }
                 >
-                  Your categories
+                  Your interests
                 </FontText>
 
                 <FontText
@@ -399,73 +523,348 @@ const ProfileScreen = ({
                     styles.settingDescription
                   }
                 >
-                  Change the topics you
-                  want to discover
+                  Choose what you want to
+                  discover
                 </FontText>
               </View>
 
-              <Ionicons
-                name="chevron-forward"
-                size={rw(20)}
-                color={
-                  colors.textMuted
+              <View
+                style={
+                  styles.chevronContainer
                 }
-              />
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={rw(18)}
+                  color={
+                    colors.textMuted
+                  }
+                />
+              </View>
             </Pressable>
+
+
+            <View
+              style={
+                styles.rowDivider
+              }
+            />
+
+
+            {/* NOTIFICATIONS */}
+
+            <Pressable
+              style={({
+                pressed,
+              }) => [
+                styles.settingRow,
+                pressed &&
+                  styles.settingPressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.settingIcon,
+                  styles.notificationIcon,
+                ]}
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={rw(21)}
+                  color={
+                    colors.primary
+                  }
+                />
+              </View>
+
+              <View
+                style={
+                  styles.settingInfo
+                }
+              >
+                <FontText
+                  variant="bodyMedium"
+                  style={
+                    styles.settingTitle
+                  }
+                >
+                  Daily facts
+                </FontText>
+
+                <FontText
+                  variant="small"
+                  style={
+                    styles.settingDescription
+                  }
+                >
+                  Manage your fact reminders
+                </FontText>
+              </View>
+
+              <View
+                style={
+                  styles.comingSoonBadge
+                }
+              >
+                <FontText
+                  variant="caption"
+                  style={
+                    styles.comingSoonText
+                  }
+                >
+                  SOON
+                </FontText>
+              </View>
+            </Pressable>
+
+
+            <View
+              style={
+                styles.rowDivider
+              }
+            />
+
+
+            {/* LANGUAGE */}
+
+            {/* <Pressable
+              style={({
+                pressed,
+              }) => [
+                styles.settingRow,
+                pressed &&
+                  styles.settingPressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.settingIcon,
+                  styles.languageIcon,
+                ]}
+              >
+                <Ionicons
+                  name="language-outline"
+                  size={rw(21)}
+                  color={
+                    colors.primary
+                  }
+                />
+              </View>
+
+              <View
+                style={
+                  styles.settingInfo
+                }
+              >
+                <FontText
+                  variant="bodyMedium"
+                  style={
+                    styles.settingTitle
+                  }
+                >
+                  Language
+                </FontText>
+
+                <FontText
+                  variant="small"
+                  style={
+                    styles.settingDescription
+                  }
+                >
+                  Choose your preferred language
+                </FontText>
+              </View>
+
+              <View
+                style={
+                  styles.languageValue
+                }
+              >
+                <FontText
+                  variant="small"
+                  style={
+                    styles.languageValueText
+                  }
+                >
+                  English
+                </FontText>
+
+                <Ionicons
+                  name="chevron-forward"
+                  size={rw(17)}
+                  color={
+                    colors.textMuted
+                  }
+                />
+              </View>
+            </Pressable> */}
+
           </View>
         </View>
 
-        {/* LOGOUT */}
 
-        <Pressable
-          onPress={
-            handleLogout
+        {/* =========================
+            KNOWLY MESSAGE
+        ========================== */}
+
+        <View
+          style={
+            styles.knowledgeCard
           }
-          disabled={loggingOut}
-          style={({
-            pressed,
-          }) => [
-            styles.logoutButton,
-
-            pressed &&
-              styles.logoutPressed,
-
-            loggingOut &&
-              styles.logoutDisabled,
-          ]}
         >
-          {loggingOut ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.error}
+          <View
+            style={
+              styles.knowledgeIcon
+            }
+          >
+            <Ionicons
+              name="bulb-outline"
+              size={rw(22)}
+              color={
+                colors.primary
+              }
             />
-          ) : (
-            <>
-              <Ionicons
-                name="log-out-outline"
-                size={rw(21)}
-                color={colors.error}
-              />
+          </View>
 
-              <FontText
-                variant="bodyMedium"
-                style={
-                  styles.logoutText
+          <View
+            style={
+              styles.knowledgeContent
+            }
+          >
+            <FontText
+              variant="bodyMedium"
+              style={
+                styles.knowledgeTitle
+              }
+            >
+              Stay curious.
+            </FontText>
+
+            <FontText
+              variant="small"
+              style={
+                styles.knowledgeText
+              }
+            >
+              There is always something
+              new worth knowing.
+            </FontText>
+          </View>
+        </View>
+
+
+        {/* =========================
+            ACCOUNT
+        ========================== */}
+
+        <View
+          style={styles.accountSection}
+        >
+          <FontText
+            variant="caption"
+            style={
+              styles.accountLabel
+            }
+          >
+            ACCOUNT
+          </FontText>
+
+          <Pressable
+            onPress={
+              handleLogout
+            }
+            disabled={
+              loggingOut
+            }
+            style={({
+              pressed,
+            }) => [
+              styles.logoutButton,
+
+              pressed &&
+                styles.logoutPressed,
+
+              loggingOut &&
+                styles.logoutDisabled,
+            ]}
+          >
+            {loggingOut ? (
+              <ActivityIndicator
+                size="small"
+                color={
+                  colors.error
                 }
-              >
-                Log out
-              </FontText>
-            </>
-          )}
-        </Pressable>
+              />
+            ) : (
+              <>
+                <View
+                  style={
+                    styles.logoutIcon
+                  }
+                >
+                  <Ionicons
+                    name="log-out-outline"
+                    size={rw(19)}
+                    color={
+                      colors.error
+                    }
+                  />
+                </View>
+
+                <FontText
+                  variant="bodyMedium"
+                  style={
+                    styles.logoutText
+                  }
+                >
+                  Log out
+                </FontText>
+              </>
+            )}
+          </Pressable>
+        </View>
+
+
+        {/* =========================
+            FOOTER
+        ========================== */}
+
+        <View
+          style={styles.footer}
+        >
+          <Ionicons
+            name="sparkles"
+            size={rw(13)}
+            color={
+              colors.textMuted
+            }
+          />
+
+          <FontText
+            variant="caption"
+            style={
+              styles.footerText
+            }
+          >
+            KNOWLY · KEEP LEARNING
+          </FontText>
+        </View>
+
       </Animated.View>
     </ScrollView>
   );
 };
 
+
 export default ProfileScreen;
 
+
 const styles = StyleSheet.create({
+
+  /* =========================
+     CONTAINER
+  ========================== */
+
   container: {
     flex: 1,
     backgroundColor:
@@ -473,9 +872,14 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    paddingHorizontal: rw(20),
-    paddingTop: rh(26),
-    paddingBottom: rh(40),
+    paddingHorizontal:
+      rw(20),
+
+    paddingTop:
+      rh(20),
+
+    paddingBottom:
+      rh(44),
   },
 
   animatedContent: {
@@ -490,81 +894,212 @@ const styles = StyleSheet.create({
       colors.background,
   },
 
-  header: {
+  loadingIcon: {
+    width: rw(48),
+    height: rw(48),
+    borderRadius: rr(16),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      "#EAF5FF",
+  },
+
+  loadingIndicator: {
+    marginTop: rh(12),
+  },
+
+
+  /* =========================
+     TOP HEADER
+  ========================== */
+
+  topHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: rh(34),
+    justifyContent: "space-between",
+    marginBottom: rh(22),
+  },
+
+  headerEyebrow: {
+    fontSize: rf(10),
+    letterSpacing: 1.6,
+    color:
+      colors.primary,
+    marginBottom: rh(3),
+  },
+
+  headerTitle: {
+    color:
+      colors.text,
+    fontSize: rf(29),
+  },
+
+  headerSparkle: {
+    width: rw(44),
+    height: rw(44),
+    borderRadius: rr(15),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      "#EAF5FF",
+  },
+
+
+  /* =========================
+     PROFILE CARD
+  ========================== */
+
+  profileCard: {
+    minHeight: rh(116),
+    borderRadius: rr(26),
+    backgroundColor:
+      colors.surface,
+    padding: rw(18),
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+
+    borderWidth: 1,
+    borderColor:
+      "rgba(0,0,0,0.035)",
+
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.035,
+    shadowRadius: 14,
+    elevation: 2,
+
+    marginBottom: rh(30),
+  },
+
+  profileCardGlow: {
+    position: "absolute",
+    width: rw(120),
+    height: rw(120),
+    borderRadius: rw(60),
+    right: rw(-45),
+    top: rh(-45),
+    backgroundColor:
+      "#EAF5FF",
+    opacity: 0.8,
   },
 
   avatar: {
-    width: rw(72),
-    height: rw(72),
+    width: rw(70),
+    height: rw(70),
+    borderRadius: rr(23),
     alignItems: "center",
     justifyContent: "center",
     backgroundColor:
       colors.primary,
-    borderRadius: rr(24),
-    marginRight: rw(16),
+    marginRight: rw(15),
   },
 
   avatarText: {
     fontSize: rf(28),
-    color: colors.white,
+    color:
+      colors.white,
   },
 
-  userInfo: {
+  profileInfo: {
     flex: 1,
+    zIndex: 1,
   },
 
-  eyebrow: {
-    fontSize: rf(10),
-    letterSpacing: 1.1,
-    color: colors.primary,
-    marginBottom: spacing.xs,
+  profileLabel: {
+    fontSize: rf(9),
+    letterSpacing: 1.2,
+    color:
+      colors.primary,
+    marginBottom: rh(5),
   },
 
-  name: {
-    color: colors.text,
+  profileName: {
+    color:
+      colors.text,
   },
 
-  email: {
+  profileEmail: {
     color:
       colors.textSecondary,
-    marginTop: spacing.xs,
+    marginTop: rh(4),
   },
+
+
+  /* =========================
+     SECTION
+  ========================== */
 
   section: {
     marginBottom: rh(28),
   },
 
-  sectionTitle: {
-    color: colors.text,
-    marginBottom: rh(14),
+  sectionHeader: {
+    marginBottom: rh(13),
   },
+
+  sectionTitle: {
+    color:
+      colors.text,
+  },
+
+  sectionSubtitle: {
+    color:
+      colors.textSecondary,
+    marginTop: rh(2),
+  },
+
+
+  /* =========================
+     SETTINGS CARD
+  ========================== */
 
   settingsCard: {
     backgroundColor:
       colors.surface,
-    borderRadius: rr(20),
+
+    borderRadius:
+      rr(22),
+
     overflow: "hidden",
+
+    borderWidth: 1,
+    borderColor:
+      "rgba(0,0,0,0.035)",
+
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.025,
+    shadowRadius: 12,
+    elevation: 1,
   },
 
   settingRow: {
+    minHeight: rh(78),
     flexDirection: "row",
     alignItems: "center",
-    padding: rw(16),
+    paddingHorizontal:
+      rw(15),
+    paddingVertical:
+      rh(12),
   },
 
   settingPressed: {
-    opacity: 0.65,
+    opacity: 0.62,
   },
 
   settingIcon: {
     width: rw(44),
     height: rw(44),
+    borderRadius: rr(14),
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: rr(14),
     marginRight: rw(13),
   },
 
@@ -573,42 +1108,212 @@ const styles = StyleSheet.create({
       "#EAF5FF",
   },
 
+  notificationIcon: {
+    backgroundColor:
+      "#F0EDFF",
+  },
+
+  languageIcon: {
+    backgroundColor:
+      "#EAF9F1",
+  },
+
   settingInfo: {
     flex: 1,
   },
 
   settingTitle: {
-    color: colors.text,
+    color:
+      colors.text,
   },
 
   settingDescription: {
     color:
       colors.textSecondary,
     marginTop: rh(3),
+    lineHeight: rf(16),
+  },
+
+  chevronContainer: {
+    width: rw(30),
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+
+  rowDivider: {
+    height: 1,
+    backgroundColor:
+      "#F0F1F3",
+    marginLeft:
+      rw(72),
+  },
+
+  comingSoonBadge: {
+    paddingHorizontal:
+      rw(8),
+    paddingVertical:
+      rh(4),
+    borderRadius:
+      rr(7),
+    backgroundColor:
+      "#F3F4F6",
+  },
+
+  comingSoonText: {
+    fontSize: rf(8),
+    letterSpacing: 0.7,
+    color:
+      colors.textMuted,
+  },
+
+  languageValue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: rw(4),
+  },
+
+  languageValueText: {
+    color:
+      colors.textSecondary,
+  },
+
+
+  /* =========================
+     KNOWLEDGE CARD
+  ========================== */
+
+  knowledgeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    backgroundColor:
+      "#F5FAFF",
+
+    borderRadius:
+      rr(20),
+
+    paddingHorizontal:
+      rw(15),
+
+    paddingVertical:
+      rh(15),
+
+    marginBottom:
+      rh(30),
+
+    borderWidth: 1,
+    borderColor:
+      "#E5F1FA",
+  },
+
+  knowledgeIcon: {
+    width: rw(44),
+    height: rw(44),
+    borderRadius: rr(14),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      "#EAF5FF",
+    marginRight:
+      rw(12),
+  },
+
+  knowledgeContent: {
+    flex: 1,
+  },
+
+  knowledgeTitle: {
+    color:
+      colors.text,
+  },
+
+  knowledgeText: {
+    color:
+      colors.textSecondary,
+    marginTop:
+      rh(2),
+  },
+
+
+  /* =========================
+     ACCOUNT
+  ========================== */
+
+  accountSection: {
+    marginBottom:
+      rh(28),
+  },
+
+  accountLabel: {
+    fontSize: rf(10),
+    letterSpacing: 1.3,
+    color:
+      colors.textMuted,
+    marginBottom:
+      rh(10),
   },
 
   logoutButton: {
-    height: rh(52),
+    height:
+      rh(52),
+
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+
+    borderRadius:
+      rr(17),
+
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor:
+      "#FECACA",
+
     backgroundColor:
       "#FFF7F7",
-    borderRadius: rr(17),
+  },
+
+  logoutIcon: {
+    width: rw(30),
+    height: rw(30),
+    borderRadius: rr(10),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      "#FEECEC",
+  },
+
+  logoutText: {
+    color:
+      colors.error,
+    marginLeft:
+      rw(9),
   },
 
   logoutPressed: {
-    opacity: 0.65,
+    opacity: 0.6,
   },
 
   logoutDisabled: {
     opacity: 0.5,
   },
 
-  logoutText: {
-    color: colors.error,
-    marginLeft: rw(8),
+
+  /* =========================
+     FOOTER
+  ========================== */
+
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: rw(6),
+    paddingTop: rh(4),
+  },
+
+  footerText: {
+    fontSize: rf(8),
+    letterSpacing: 1.1,
+    color:
+      colors.textMuted,
   },
 });
