@@ -1,9 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   ActivityIndicator,
@@ -13,48 +8,27 @@ import {
   ScrollView,
   StyleSheet,
   View,
-} from "react-native";
+} from 'react-native';
 
-import Ionicons from "@react-native-vector-icons/ionicons";
+import Ionicons from '@react-native-vector-icons/ionicons';
 
-import type {
-  NativeStackNavigationProp,
-} from "@react-navigation/native-stack";
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import {
-  useFocusEffect,
-} from "@react-navigation/native";
+import { useFocusEffect } from '@react-navigation/native';
 
-import {
-  clearOnboardingData,
-} from "../../services/storageService";
+import { clearOnboardingData } from '../../services/storageService';
 
-import {
-  supabase,
-} from "../../lib/supabase";
+import { supabase } from '../../lib/supabase';
 
-import FontText from "../../components/common/FontText";
+import FontText from '../../components/common/FontText';
 
-import {
-  colors,
-} from "../../constant/colors";
+import { colors } from '../../constant/colors';
 
-import {
-  rf,
-  rw,
-  rh,
-  rr,
-} from "../../constant/responsive";
+import { rf, rw, rh, rr } from '../../constant/responsive';
 
-import type {
-  RootStackParamList,
-} from "../../types/navigation";
+import type { RootStackParamList } from '../../types/navigation';
 
-
-type ProfileNavigationProp =
-  NativeStackNavigationProp<
-    RootStackParamList
-  >;
+type ProfileNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type ProfileScreenProps = {
   navigation: ProfileNavigationProp;
@@ -72,49 +46,23 @@ type NotificationPreferences = {
   evening: boolean;
 };
 
+const ProfileScreen = ({ navigation }: ProfileScreenProps) => {
+  const [profile, setProfile] = useState<Profile | null>(null);
 
-const ProfileScreen = ({
-  navigation,
-}: ProfileScreenProps) => {
-  const [
-    profile,
-    setProfile,
-  ] = useState<Profile | null>(
-    null,
-  );
+  const [notificationPreferences, setNotificationPreferences] =
+    useState<NotificationPreferences | null>(null);
 
-  const [
-    notificationPreferences,
-    setNotificationPreferences,
-  ] = useState<NotificationPreferences | null>(
-    null,
-  );
+  const [loading, setLoading] = useState(true);
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const [
-    loggingOut,
-    setLoggingOut,
-  ] = useState(false);
+  const fadeAnimation = useRef(new Animated.Value(0)).current;
 
-  const fadeAnimation =
-    useRef(
-      new Animated.Value(0),
-    ).current;
-
-  const slideAnimation =
-    useRef(
-      new Animated.Value(18),
-    ).current;
-
+  const slideAnimation = useRef(new Animated.Value(18)).current;
 
   useEffect(() => {
     loadProfile();
   }, []);
-
 
   /*
    * Reload notification settings
@@ -139,18 +87,14 @@ const ProfileScreen = ({
     }, []),
   );
 
-
   const loadProfile = async () => {
     try {
       setLoading(true);
 
       const {
-        data: {
-          user,
-        },
+        data: { user },
         error: userError,
-      } =
-        await supabase.auth.getUser();
+      } = await supabase.auth.getUser();
 
       if (userError) {
         throw userError;
@@ -161,18 +105,10 @@ const ProfileScreen = ({
         return;
       }
 
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("profiles")
-        .select(
-          "username, email",
-        )
-        .eq(
-          "id",
-          user.id,
-        )
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username, email')
+        .eq('id', user.id)
         .single();
 
       if (error) {
@@ -180,390 +116,237 @@ const ProfileScreen = ({
       }
 
       setProfile({
-        username:
-          data?.username ??
-          "Knowledge Explorer",
+        username: data?.username ?? 'Knowledge Explorer',
 
-        email:
-          data?.email ??
-          user.email ??
-          "",
+        email: data?.email ?? user.email ?? '',
       });
 
       await loadNotificationPreferences();
 
       Animated.parallel([
-        Animated.timing(
-          fadeAnimation,
-          {
-            toValue: 1,
-            duration: 450,
-            useNativeDriver: true,
-          },
-        ),
+        Animated.timing(fadeAnimation, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
 
-        Animated.timing(
-          slideAnimation,
-          {
-            toValue: 0,
-            duration: 450,
-            useNativeDriver: true,
-          },
-        ),
+        Animated.timing(slideAnimation, {
+          toValue: 0,
+          duration: 450,
+          useNativeDriver: true,
+        }),
       ]).start();
-
     } catch (error) {
-      console.error(
-        "Failed to load profile:",
-        error,
-      );
+      console.error('Failed to load profile:', error);
 
       setProfile({
-        username:
-          "Knowledge Explorer",
+        username: 'Knowledge Explorer',
 
-        email: "",
+        email: '',
       });
 
-      Animated.timing(
-        fadeAnimation,
-        {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        },
-      ).start();
-
+      Animated.timing(fadeAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     } finally {
       setLoading(false);
     }
   };
 
+  const loadNotificationPreferences = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const loadNotificationPreferences =
-    async () => {
-      try {
-        const {
-          data: {
-            user,
-          },
-        } =
-          await supabase.auth.getUser();
-
-        if (!user) {
-          return;
-        }
-
-        const {
-          data,
-          error,
-        } = await supabase
-          .from("notification_preferences")
-          .select(
-            "notifications_enabled, morning, afternoon, evening",
-          )
-          .eq(
-            "user_id",
-            user.id,
-          )
-          .maybeSingle();
-
-        if (error) {
-          console.error(
-            "Failed to load notification preferences:",
-            error,
-          );
-
-          return;
-        }
-
-        if (!data) {
-          setNotificationPreferences(
-            null,
-          );
-
-          return;
-        }
-
-        setNotificationPreferences({
-          notifications_enabled:
-            data.notifications_enabled,
-
-          morning:
-            data.morning,
-
-          afternoon:
-            data.afternoon,
-
-          evening:
-            data.evening,
-        });
-
-      } catch (error) {
-        console.error(
-          "Notification preferences error:",
-          error,
-        );
-      }
-    };
-
-
-  const getNotificationSummary =
-    () => {
-      if (
-        !notificationPreferences ||
-        !notificationPreferences
-          .notifications_enabled
-      ) {
-        return "Notifications off";
+      if (!user) {
+        return;
       }
 
-      const times: string[] = [];
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('notifications_enabled, morning, afternoon, evening')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if (
-        notificationPreferences.morning
-      ) {
-        times.push("Morning");
+      if (error) {
+        console.error('Failed to load notification preferences:', error);
+
+        return;
       }
 
-      if (
-        notificationPreferences.afternoon
-      ) {
-        times.push("Afternoon");
+      if (!data) {
+        setNotificationPreferences(null);
+
+        return;
       }
 
-      if (
-        notificationPreferences.evening
-      ) {
-        times.push("Evening");
-      }
+      setNotificationPreferences({
+        notifications_enabled: data.notifications_enabled,
 
-      if (times.length === 0) {
-        return "Notifications off";
-      }
+        morning: data.morning,
 
-      return times.join(" · ");
-    };
+        afternoon: data.afternoon,
 
-
-  const handleLogout = () => {
-    Alert.alert(
-      "Log out",
-      "Are you sure you want to log out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Log out",
-          style: "destructive",
-          onPress: logout,
-        },
-      ],
-    );
+        evening: data.evening,
+      });
+    } catch (error) {
+      console.error('Notification preferences error:', error);
+    }
   };
 
+  const getNotificationSummary = () => {
+    if (
+      !notificationPreferences ||
+      !notificationPreferences.notifications_enabled
+    ) {
+      return 'Notifications off';
+    }
+
+    const times: string[] = [];
+
+    if (notificationPreferences.morning) {
+      times.push('Morning');
+    }
+
+    if (notificationPreferences.afternoon) {
+      times.push('Afternoon');
+    }
+
+    if (notificationPreferences.evening) {
+      times.push('Evening');
+    }
+
+    if (times.length === 0) {
+      return 'Notifications off';
+    }
+
+    return times.join(' · ');
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Log out', 'Are you sure you want to log out?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: logout,
+      },
+    ]);
+  };
 
   const logout = async () => {
     try {
       setLoggingOut(true);
 
-      const {
-        error,
-      } =
-        await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
 
       if (error) {
-        Alert.alert(
-          "Logout failed",
-          error.message,
-        );
+        Alert.alert('Logout failed', error.message);
 
         return;
       }
 
       await clearOnboardingData();
 
-      navigation.replace(
-        "Welcome",
-      );
-
+      navigation.replace('Welcome');
     } catch (error) {
-      console.error(
-        "Logout error:",
-        error,
-      );
+      console.error('Logout error:', error);
 
-      Alert.alert(
-        "Logout failed",
-        "Something went wrong. Please try again.",
-      );
-
+      Alert.alert('Logout failed', 'Something went wrong. Please try again.');
     } finally {
       setLoggingOut(false);
     }
   };
 
-
   if (loading) {
     return (
-      <View
-        style={
-          styles.loadingContainer
-        }
-      >
-        <View
-          style={
-            styles.loadingIcon
-          }
-        >
-          <Ionicons
-            name="sparkles"
-            size={rw(22)}
-            color={colors.primary}
-          />
+      <View style={styles.loadingContainer}>
+        <View style={styles.loadingIcon}>
+          <Ionicons name="sparkles" size={rw(22)} color={colors.primary} />
         </View>
 
         <ActivityIndicator
           size="small"
           color={colors.primary}
-          style={
-            styles.loadingIndicator
-          }
+          style={styles.loadingIndicator}
         />
       </View>
     );
   }
 
+  const username = profile?.username?.trim() || 'Knowledge Explorer';
 
-  const username =
-    profile?.username?.trim() ||
-    "Knowledge Explorer";
+  const email = profile?.email?.trim() || '';
 
-  const email =
-    profile?.email?.trim() ||
-    "";
+  const avatarLetter = username.charAt(0).toUpperCase();
 
-  const avatarLetter =
-    username
-      .charAt(0)
-      .toUpperCase();
-
-  const notificationSummary =
-    getNotificationSummary();
-
+  const notificationSummary = getNotificationSummary();
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={
-        styles.content
-      }
-      showsVerticalScrollIndicator={
-        false
-      }
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
     >
       <Animated.View
         style={[
           styles.animatedContent,
           {
-            opacity:
-              fadeAnimation,
+            opacity: fadeAnimation,
 
             transform: [
               {
-                translateY:
-                  slideAnimation,
+                translateY: slideAnimation,
               },
             ],
           },
         ]}
       >
-
         {/* =========================
             TOP HEADER
         ========================== */}
 
-        <View
-          style={styles.topHeader}
-        >
+        <View style={styles.topHeader}>
           <View>
-            <FontText
-              variant="caption"
-              style={
-                styles.headerEyebrow
-              }
-            >
+            <FontText variant="caption" style={styles.headerEyebrow}>
               KNOWLY
             </FontText>
 
-            <FontText
-              variant="heading1"
-              style={
-                styles.headerTitle
-              }
-            >
+            <FontText variant="heading1" style={styles.headerTitle}>
               Profile
             </FontText>
           </View>
 
-          <View
-            style={
-              styles.headerSparkle
-            }
-          >
-            <Ionicons
-              name="sparkles"
-              size={rw(20)}
-              color={colors.primary}
-            />
+          <View style={styles.headerSparkle}>
+            <Ionicons name="sparkles" size={rw(20)} color={colors.primary} />
           </View>
         </View>
-
 
         {/* =========================
             PROFILE CARD
         ========================== */}
 
-        <View
-          style={styles.profileCard}
-        >
-          <View
-            style={
-              styles.profileCardGlow
-            }
-          />
+        <View style={styles.profileCard}>
+          <View style={styles.profileCardGlow} />
 
-          <View
-            style={styles.avatar}
-          >
-            <FontText
-              style={
-                styles.avatarText
-              }
-            >
-              {avatarLetter}
-            </FontText>
+          <View style={styles.avatar}>
+            <FontText style={styles.avatarText}>{avatarLetter}</FontText>
           </View>
 
-          <View
-            style={styles.profileInfo}
-          >
-            <FontText
-              variant="caption"
-              style={
-                styles.profileLabel
-              }
-            >
+          <View style={styles.profileInfo}>
+            <FontText variant="caption" style={styles.profileLabel}>
               YOUR KNOWLY PROFILE
             </FontText>
 
             <FontText
               variant="heading2"
-              style={
-                styles.profileName
-              }
+              style={styles.profileName}
               numberOfLines={1}
             >
               {username}
@@ -572,9 +355,7 @@ const ProfileScreen = ({
             {email ? (
               <FontText
                 variant="small"
-                style={
-                  styles.profileEmail
-                }
+                style={styles.profileEmail}
                 numberOfLines={1}
               >
                 {email}
@@ -583,205 +364,107 @@ const ProfileScreen = ({
           </View>
         </View>
 
-
         {/* =========================
             PERSONALIZE
         ========================== */}
 
-        <View
-          style={styles.section}
-        >
-          <View
-            style={
-              styles.sectionHeader
-            }
-          >
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <View>
-              <FontText
-                variant="heading2"
-                style={
-                  styles.sectionTitle
-                }
-              >
+              <FontText variant="heading2" style={styles.sectionTitle}>
                 Personalize
               </FontText>
 
-              <FontText
-                variant="small"
-                style={
-                  styles.sectionSubtitle
-                }
-              >
+              <FontText variant="small" style={styles.sectionSubtitle}>
                 Make Knowly more you
               </FontText>
             </View>
           </View>
 
-
-          <View
-            style={styles.settingsCard}
-          >
-
+          <View style={styles.settingsCard}>
             {/* CATEGORIES */}
 
             <Pressable
               onPress={() =>
-                navigation.navigate(
-                  "SelectCategories",
-                  {
-                    fromSettings: true,
-                  },
-                )
+                navigation.navigate('SelectCategories', {
+                  fromSettings: true,
+                })
               }
-              style={({
-                pressed,
-              }) => [
+              style={({ pressed }) => [
                 styles.settingRow,
-                pressed &&
-                  styles.settingPressed,
+                pressed && styles.settingPressed,
               ]}
             >
-              <View
-                style={[
-                  styles.settingIcon,
-                  styles.categoryIcon,
-                ]}
-              >
+              <View style={[styles.settingIcon, styles.categoryIcon]}>
                 <Ionicons
                   name="grid-outline"
                   size={rw(21)}
-                  color={
-                    colors.primary
-                  }
+                  color={colors.primary}
                 />
               </View>
 
-              <View
-                style={
-                  styles.settingInfo
-                }
-              >
-                <FontText
-                  variant="bodyMedium"
-                  style={
-                    styles.settingTitle
-                  }
-                >
+              <View style={styles.settingInfo}>
+                <FontText variant="bodyMedium" style={styles.settingTitle}>
                   Your interests
                 </FontText>
 
-                <FontText
-                  variant="small"
-                  style={
-                    styles.settingDescription
-                  }
-                >
-                  Choose what you want to
-                  discover
+                <FontText variant="small" style={styles.settingDescription}>
+                  Choose what you want to discover
                 </FontText>
               </View>
 
-              <View
-                style={
-                  styles.chevronContainer
-                }
-              >
+              <View style={styles.chevronContainer}>
                 <Ionicons
                   name="chevron-forward"
                   size={rw(18)}
-                  color={
-                    colors.textMuted
-                  }
+                  color={colors.textMuted}
                 />
               </View>
             </Pressable>
 
-
-            <View
-              style={
-                styles.rowDivider
-              }
-            />
-
+            <View style={styles.rowDivider} />
 
             {/* NOTIFICATIONS */}
 
             <Pressable
-              onPress={() =>
-                navigation.navigate(
-                  "NotificationSettings",
-                )
-              }
-              style={({
-                pressed,
-              }) => [
+              onPress={() => navigation.navigate('NotificationSettings')}
+              style={({ pressed }) => [
                 styles.settingRow,
-                pressed &&
-                  styles.settingPressed,
+                pressed && styles.settingPressed,
               ]}
             >
-              <View
-                style={[
-                  styles.settingIcon,
-                  styles.notificationIcon,
-                ]}
-              >
+              <View style={[styles.settingIcon, styles.notificationIcon]}>
                 <Ionicons
                   name="notifications-outline"
                   size={rw(21)}
-                  color={
-                    colors.primary
-                  }
+                  color={colors.primary}
                 />
               </View>
 
-              <View
-                style={
-                  styles.settingInfo
-                }
-              >
-                <FontText
-                  variant="bodyMedium"
-                  style={
-                    styles.settingTitle
-                  }
-                >
+              <View style={styles.settingInfo}>
+                <FontText variant="bodyMedium" style={styles.settingTitle}>
                   Daily facts
                 </FontText>
 
                 <FontText
                   variant="small"
-                  style={
-                    styles.settingDescription
-                  }
+                  style={styles.settingDescription}
                   numberOfLines={1}
                 >
                   {notificationSummary}
                 </FontText>
               </View>
 
-              <View
-                style={
-                  styles.chevronContainer
-                }
-              >
+              <View style={styles.chevronContainer}>
                 <Ionicons
                   name="chevron-forward"
                   size={rw(18)}
-                  color={
-                    colors.textMuted
-                  }
+                  color={colors.textMuted}
                 />
               </View>
             </Pressable>
 
-
-            <View
-              style={
-                styles.rowDivider
-              }
-            />
-
+            <View style={styles.rowDivider} />
 
             {/* LANGUAGE */}
 
@@ -856,125 +539,66 @@ const ProfileScreen = ({
                 />
               </View>
             </Pressable> */}
-
           </View>
         </View>
-
 
         {/* =========================
             KNOWLY MESSAGE
         ========================== */}
 
-        <View
-          style={
-            styles.knowledgeCard
-          }
-        >
-          <View
-            style={
-              styles.knowledgeIcon
-            }
-          >
+        <View style={styles.knowledgeCard}>
+          <View style={styles.knowledgeIcon}>
             <Ionicons
               name="bulb-outline"
               size={rw(22)}
-              color={
-                colors.primary
-              }
+              color={colors.primary}
             />
           </View>
 
-          <View
-            style={
-              styles.knowledgeContent
-            }
-          >
-            <FontText
-              variant="bodyMedium"
-              style={
-                styles.knowledgeTitle
-              }
-            >
+          <View style={styles.knowledgeContent}>
+            <FontText variant="bodyMedium" style={styles.knowledgeTitle}>
               Stay curious.
             </FontText>
 
-            <FontText
-              variant="small"
-              style={
-                styles.knowledgeText
-              }
-            >
-              There is always something
-              new worth knowing.
+            <FontText variant="small" style={styles.knowledgeText}>
+              There is always something new worth knowing.
             </FontText>
           </View>
         </View>
-
 
         {/* =========================
             ACCOUNT
         ========================== */}
 
-        <View
-          style={styles.accountSection}
-        >
-          <FontText
-            variant="caption"
-            style={
-              styles.accountLabel
-            }
-          >
+        <View style={styles.accountSection}>
+          <FontText variant="caption" style={styles.accountLabel}>
             ACCOUNT
           </FontText>
 
           <Pressable
-            onPress={
-              handleLogout
-            }
-            disabled={
-              loggingOut
-            }
-            style={({
-              pressed,
-            }) => [
+            onPress={handleLogout}
+            disabled={loggingOut}
+            style={({ pressed }) => [
               styles.logoutButton,
 
-              pressed &&
-                styles.logoutPressed,
+              pressed && styles.logoutPressed,
 
-              loggingOut &&
-                styles.logoutDisabled,
+              loggingOut && styles.logoutDisabled,
             ]}
           >
             {loggingOut ? (
-              <ActivityIndicator
-                size="small"
-                color={
-                  colors.error
-                }
-              />
+              <ActivityIndicator size="small" color={colors.error} />
             ) : (
               <>
-                <View
-                  style={
-                    styles.logoutIcon
-                  }
-                >
+                <View style={styles.logoutIcon}>
                   <Ionicons
                     name="log-out-outline"
                     size={rw(19)}
-                    color={
-                      colors.error
-                    }
+                    color={colors.error}
                   />
                 </View>
 
-                <FontText
-                  variant="bodyMedium"
-                  style={
-                    styles.logoutText
-                  }
-                >
+                <FontText variant="bodyMedium" style={styles.logoutText}>
                   Log out
                 </FontText>
               </>
@@ -982,113 +606,86 @@ const ProfileScreen = ({
           </Pressable>
         </View>
 
-
         {/* =========================
             FOOTER
         ========================== */}
 
-        <View
-          style={styles.footer}
-        >
-          <Ionicons
-            name="sparkles"
-            size={rw(13)}
-            color={
-              colors.textMuted
-            }
-          />
+        <View style={styles.footer}>
+          <Ionicons name="sparkles" size={rw(13)} color={colors.textMuted} />
 
-          <FontText
-            variant="caption"
-            style={
-              styles.footerText
-            }
-          >
+          <FontText variant="caption" style={styles.footerText}>
             KNOWLY · KEEP LEARNING
           </FontText>
         </View>
-
       </Animated.View>
     </ScrollView>
   );
 };
 
-
 export default ProfileScreen;
 
-
 const styles = StyleSheet.create({
-
   /* =========================
      CONTAINER
   ========================== */
 
   container: {
     flex: 1,
-    backgroundColor:
-      colors.background,
+    backgroundColor: colors.background,
   },
 
   content: {
-    paddingHorizontal:
-      rw(20),
+    paddingHorizontal: rw(20),
 
-    paddingTop:
-      rh(20),
+    paddingTop: rh(20),
 
-    paddingBottom:
-      rh(44),
+    paddingBottom: rh(44),
   },
 
   animatedContent: {
-    width: "100%",
+    width: '100%',
   },
 
   loadingContainer: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
   },
 
   loadingIcon: {
     width: rw(48),
     height: rw(48),
     borderRadius: rr(16),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "#EAF5FF",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF5FF',
   },
 
   loadingIndicator: {
     marginTop: rh(12),
   },
 
-
   /* =========================
      TOP HEADER
   ========================== */
 
   topHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: rh(22),
   },
 
   headerEyebrow: {
     fontSize: rf(10),
     letterSpacing: 1.6,
-    color:
-      colors.primary,
+    color: colors.primary,
     marginBottom: rh(3),
   },
 
   headerTitle: {
-    color:
-      colors.text,
+    color: colors.text,
     fontSize: rf(29),
   },
 
@@ -1096,12 +693,10 @@ const styles = StyleSheet.create({
     width: rw(44),
     height: rw(44),
     borderRadius: rr(15),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "#EAF5FF",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF5FF',
   },
-
 
   /* =========================
      PROFILE CARD
@@ -1110,18 +705,16 @@ const styles = StyleSheet.create({
   profileCard: {
     minHeight: rh(116),
     borderRadius: rr(26),
-    backgroundColor:
-      colors.surface,
+    backgroundColor: colors.surface,
     padding: rw(18),
-    flexDirection: "row",
-    alignItems: "center",
-    overflow: "hidden",
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
 
     borderWidth: 1,
-    borderColor:
-      "rgba(0,0,0,0.035)",
+    borderColor: 'rgba(0,0,0,0.035)',
 
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 5,
@@ -1134,14 +727,13 @@ const styles = StyleSheet.create({
   },
 
   profileCardGlow: {
-    position: "absolute",
+    position: 'absolute',
     width: rw(120),
     height: rw(120),
     borderRadius: rw(60),
     right: rw(-45),
     top: rh(-45),
-    backgroundColor:
-      "#EAF5FF",
+    backgroundColor: '#EAF5FF',
     opacity: 0.8,
   },
 
@@ -1149,17 +741,15 @@ const styles = StyleSheet.create({
     width: rw(70),
     height: rw(70),
     borderRadius: rr(23),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
     marginRight: rw(15),
   },
 
   avatarText: {
     fontSize: rf(28),
-    color:
-      colors.white,
+    color: colors.white,
   },
 
   profileInfo: {
@@ -1170,22 +760,18 @@ const styles = StyleSheet.create({
   profileLabel: {
     fontSize: rf(9),
     letterSpacing: 1.2,
-    color:
-      colors.primary,
+    color: colors.primary,
     marginBottom: rh(5),
   },
 
   profileName: {
-    color:
-      colors.text,
+    color: colors.text,
   },
 
   profileEmail: {
-    color:
-      colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: rh(4),
   },
-
 
   /* =========================
      SECTION
@@ -1200,35 +786,29 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    color:
-      colors.text,
+    color: colors.text,
   },
 
   sectionSubtitle: {
-    color:
-      colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: rh(2),
   },
-
 
   /* =========================
      SETTINGS CARD
   ========================== */
 
   settingsCard: {
-    backgroundColor:
-      colors.surface,
+    backgroundColor: colors.surface,
 
-    borderRadius:
-      rr(22),
+    borderRadius: rr(22),
 
-    overflow: "hidden",
+    overflow: 'hidden',
 
     borderWidth: 1,
-    borderColor:
-      "rgba(0,0,0,0.035)",
+    borderColor: 'rgba(0,0,0,0.035)',
 
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -1240,12 +820,10 @@ const styles = StyleSheet.create({
 
   settingRow: {
     minHeight: rh(78),
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal:
-      rw(15),
-    paddingVertical:
-      rh(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: rw(15),
+    paddingVertical: rh(12),
   },
 
   settingPressed: {
@@ -1256,24 +834,21 @@ const styles = StyleSheet.create({
     width: rw(44),
     height: rw(44),
     borderRadius: rr(14),
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: rw(13),
   },
 
   categoryIcon: {
-    backgroundColor:
-      "#EAF5FF",
+    backgroundColor: '#EAF5FF',
   },
 
   notificationIcon: {
-    backgroundColor:
-      "#F0EDFF",
+    backgroundColor: '#F0EDFF',
   },
 
   languageIcon: {
-    backgroundColor:
-      "#EAF9F1",
+    backgroundColor: '#EAF9F1',
   },
 
   settingInfo: {
@@ -1281,81 +856,67 @@ const styles = StyleSheet.create({
   },
 
   settingTitle: {
-    color:
-      colors.text,
+    color: colors.text,
   },
 
   settingDescription: {
-    color:
-      colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: rh(3),
     lineHeight: rf(16),
   },
 
   chevronContainer: {
     width: rw(30),
-    alignItems: "flex-end",
-    justifyContent: "center",
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
 
   rowDivider: {
     height: 1,
-    backgroundColor:
-      "#F0F1F3",
-    marginLeft:
-      rw(72),
+    backgroundColor: '#F0F1F3',
+    marginLeft: rw(72),
   },
 
   languageValue: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: rw(4),
   },
 
   languageValueText: {
-    color:
-      colors.textSecondary,
+    color: colors.textSecondary,
   },
-
 
   /* =========================
      KNOWLEDGE CARD
   ========================== */
 
   knowledgeCard: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
 
-    backgroundColor:
-      "#F5FAFF",
+    backgroundColor: '#F5FAFF',
 
-    borderRadius:
-      rr(20),
+    borderRadius: rr(20),
 
-    paddingHorizontal:
-      rw(15),
+    paddingHorizontal: rw(15),
 
-    paddingVertical:
-      rh(15),
+    paddingVertical: rh(15),
 
-    marginBottom:
-      rh(30),
+    marginBottom: rh(30),
 
     borderWidth: 1,
-    borderColor:
-      "#E5F1FA",
+    borderColor: '#E5F1FA',
   },
 
   knowledgeIcon: {
     width: rw(44),
     height: rw(44),
     borderRadius: rr(14),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "#EAF5FF",
-    marginRight:
-      rw(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF5FF',
+    marginRight: rw(12),
   },
 
   knowledgeContent: {
@@ -1363,70 +924,56 @@ const styles = StyleSheet.create({
   },
 
   knowledgeTitle: {
-    color:
-      colors.text,
+    color: colors.text,
   },
 
   knowledgeText: {
-    color:
-      colors.textSecondary,
-    marginTop:
-      rh(2),
+    color: colors.textSecondary,
+    marginTop: rh(2),
   },
-
 
   /* =========================
      ACCOUNT
   ========================== */
 
   accountSection: {
-    marginBottom:
-      rh(28),
+    marginBottom: rh(28),
   },
 
   accountLabel: {
     fontSize: rf(10),
     letterSpacing: 1.3,
-    color:
-      colors.textMuted,
-    marginBottom:
-      rh(10),
+    color: colors.textMuted,
+    marginBottom: rh(10),
   },
 
   logoutButton: {
-    height:
-      rh(52),
+    height: rh(52),
 
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
 
-    borderRadius:
-      rr(17),
+    borderRadius: rr(17),
 
     borderWidth: 1,
-    borderColor:
-      "#FECACA",
+    borderColor: '#FECACA',
 
-    backgroundColor:
-      "#FFF7F7",
+    backgroundColor: '#FFF7F7',
   },
 
   logoutIcon: {
     width: rw(30),
     height: rw(30),
     borderRadius: rr(10),
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor:
-      "#FEECEC",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEECEC',
   },
 
   logoutText: {
-    color:
-      colors.error,
-    marginLeft:
-      rw(9),
+    color: colors.error,
+    marginLeft: rw(9),
   },
 
   logoutPressed: {
@@ -1437,15 +984,14 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 
-
   /* =========================
      FOOTER
   ========================== */
 
   footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: rw(6),
     paddingTop: rh(4),
   },
@@ -1453,7 +999,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: rf(8),
     letterSpacing: 1.1,
-    color:
-      colors.textMuted,
+    color: colors.textMuted,
   },
 });

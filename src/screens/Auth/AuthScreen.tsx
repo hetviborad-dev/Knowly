@@ -37,6 +37,7 @@ import type { RootStackParamList } from "../../types/navigation";
 import useDisableOnboardingBack from "../../hooks/useDisableOnboardingBack";
 
 import Logo from "../../assets/svgs/logo.svg";
+import { getAndSaveFCMToken } from "../../services/pushNotificationService";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -136,7 +137,6 @@ const AuthScreen = ({
             password,
           },
         );
-
       if (error) {
         Alert.alert(
           "Login failed",

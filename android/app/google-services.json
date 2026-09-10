@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "263297596128",
+    "project_id": "knowly-3383f",
+    "storage_bucket": "knowly-3383f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:263297596128:android:111d8cbc0ff398e14e6e85",
+        "android_client_info": {
+          "package_name": "com.knowly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMfxMB-UqznAY20uUR4Fi9FWNpTEM5ynE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

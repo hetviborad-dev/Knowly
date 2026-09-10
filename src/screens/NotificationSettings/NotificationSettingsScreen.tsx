@@ -36,6 +36,10 @@ import type {
   RootStackParamList,
 } from '../../types/navigation';
 
+import {
+  getAndSaveFCMToken,
+} from '../../services/pushNotificationService';
+
 type Props = NativeStackScreenProps<
   RootStackParamList,
   'NotificationSettings'
@@ -65,11 +69,15 @@ const TIMES = [
 const NotificationSettingsScreen = ({
   navigation,
 }: Props) => {
-  const [notificationsEnabled, setNotificationsEnabled] =
-    useState(false);
+  const [
+    notificationsEnabled,
+    setNotificationsEnabled,
+  ] = useState(false);
 
-  const [selectedTimes, setSelectedTimes] =
-    useState<string[]>([]);
+  const [
+    selectedTimes,
+    setSelectedTimes,
+  ] = useState<string[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -107,9 +115,14 @@ const NotificationSettingsScreen = ({
         data,
         error,
       } = await supabase
-        .from('notification_preferences')
+        .from('user_notification_settings')
         .select(
-          'notifications_enabled, morning, afternoon, evening',
+          `
+            enabled,
+            morning,
+            afternoon,
+            evening
+          `,
         )
         .eq('user_id', user.id)
         .maybeSingle();
@@ -136,7 +149,7 @@ const NotificationSettingsScreen = ({
       }
 
       setNotificationsEnabled(
-        data.notifications_enabled,
+        data.enabled,
       );
 
       const times: string[] = [];
@@ -219,15 +232,37 @@ const NotificationSettingsScreen = ({
         return;
       }
 
+      /*
+       * If notifications are enabled,
+       * make sure we have permission and
+       * a valid FCM token.
+       */
+      if (notificationsEnabled) {
+        const token =
+          await getAndSaveFCMToken();
+
+        if (!token) {
+          Alert.alert(
+            'Notifications unavailable',
+            'Please allow notifications for Knowly and try again.',
+          );
+
+          return;
+        }
+      }
+
+      /*
+       * Save notification settings.
+       */
       const {
         error,
       } = await supabase
-        .from('notification_preferences')
+        .from('user_notification_settings')
         .upsert(
           {
             user_id: user.id,
 
-            notifications_enabled:
+            enabled:
               notificationsEnabled,
 
             morning:
@@ -248,6 +283,14 @@ const NotificationSettingsScreen = ({
                 'evening',
               ),
 
+            timezone:
+              'Asia/Kolkata',
+
+            notifications_per_day:
+              notificationsEnabled
+                ? selectedTimes.length
+                : 0,
+
             updated_at:
               new Date().toISOString(),
           },
@@ -258,7 +301,7 @@ const NotificationSettingsScreen = ({
 
       if (error) {
         console.log(
-          'Save notification preferences error:',
+          'Save notification settings error:',
           error,
         );
 
@@ -270,7 +313,19 @@ const NotificationSettingsScreen = ({
         return;
       }
 
-      navigation.goBack();
+      Alert.alert(
+        'Saved',
+        notificationsEnabled
+          ? 'Your daily fact notifications are enabled.'
+          : 'Daily fact notifications are turned off.',
+        [
+          {
+            text: 'OK',
+            onPress: () =>
+              navigation.goBack(),
+          },
+        ],
+      );
     } catch (error) {
       console.log(
         'Save notification settings error:',
@@ -309,7 +364,9 @@ const NotificationSettingsScreen = ({
 
         <View style={styles.header}>
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={() =>
+              navigation.goBack()
+            }
             style={styles.backButton}
           >
             <Ionicons
@@ -370,6 +427,7 @@ const NotificationSettingsScreen = ({
             onValueChange={
               handleToggleNotifications
             }
+            disabled={saving}
             trackColor={{
               false: colors.border,
               true: colors.primary,
@@ -539,49 +597,35 @@ const NotificationSettingsScreen = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-
     backgroundColor: colors.background,
   },
 
   loadingContainer: {
     flex: 1,
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     backgroundColor: colors.background,
   },
 
   contentContainer: {
     paddingHorizontal: rw(20),
-
     paddingTop: rh(20),
-
     paddingBottom: rh(120),
   },
 
   header: {
     flexDirection: 'row',
-
     alignItems: 'flex-start',
-
     marginBottom: rh(28),
   },
 
   backButton: {
     width: rw(42),
-
     height: rw(42),
-
     borderRadius: rr(21),
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     backgroundColor: colors.white,
-
     marginRight: rw(12),
   },
 
@@ -591,47 +635,32 @@ const styles = StyleSheet.create({
 
   title: {
     color: colors.text,
-
     marginBottom: rh(5),
   },
 
   subtitle: {
     color: colors.textMuted,
-
     lineHeight: rf(21),
   },
 
   toggleCard: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     backgroundColor: colors.white,
-
     borderRadius: rr(16),
-
     padding: rw(16),
-
     marginBottom: rh(28),
-
     borderWidth: 1,
-
     borderColor: colors.border,
   },
 
   toggleIcon: {
     width: rw(46),
-
     height: rw(46),
-
     borderRadius: rr(14),
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     backgroundColor: colors.primaryLight,
-
     marginRight: rw(12),
   },
 
@@ -641,13 +670,11 @@ const styles = StyleSheet.create({
 
   toggleTitle: {
     color: colors.text,
-
     marginBottom: rh(3),
   },
 
   toggleDescription: {
     color: colors.textMuted,
-
     lineHeight: rf(18),
   },
 
@@ -657,13 +684,11 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     color: colors.text,
-
     marginBottom: rh(4),
   },
 
   sectionDescription: {
     color: colors.textMuted,
-
     marginBottom: rh(14),
   },
 
@@ -673,17 +698,11 @@ const styles = StyleSheet.create({
 
   timeCard: {
     flexDirection: 'row',
-
     alignItems: 'center',
-
     backgroundColor: colors.white,
-
     borderRadius: rr(16),
-
     padding: rw(14),
-
     borderWidth: 1,
-
     borderColor: colors.border,
   },
 
@@ -693,17 +712,11 @@ const styles = StyleSheet.create({
 
   timeIcon: {
     width: rw(46),
-
     height: rw(46),
-
     borderRadius: rr(14),
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     backgroundColor: colors.background,
-
     marginRight: rw(12),
   },
 
@@ -717,7 +730,6 @@ const styles = StyleSheet.create({
 
   timeLabel: {
     color: colors.text,
-
     marginBottom: rh(2),
   },
 
@@ -731,81 +743,53 @@ const styles = StyleSheet.create({
 
   checkCircle: {
     width: rw(24),
-
     height: rw(24),
-
     borderRadius: rr(12),
-
     borderWidth: 1.5,
-
     borderColor: colors.border,
-
     alignItems: 'center',
-
     justifyContent: 'center',
   },
 
   checkCircleSelected: {
     backgroundColor: colors.primary,
-
     borderColor: colors.primary,
   },
 
   disabledCard: {
     alignItems: 'center',
-
     justifyContent: 'center',
-
     backgroundColor: colors.white,
-
     borderRadius: rr(16),
-
     paddingHorizontal: rw(24),
-
     paddingVertical: rh(30),
-
     borderWidth: 1,
-
     borderColor: colors.border,
   },
 
   disabledText: {
     color: colors.textMuted,
-
     textAlign: 'center',
-
     marginTop: rh(10),
-
     lineHeight: rf(21),
   },
 
   bottomContainer: {
     position: 'absolute',
-
     left: 0,
-
     right: 0,
-
     bottom: 0,
-
     paddingHorizontal: rw(20),
-
     paddingTop: rh(12),
-
     paddingBottom: rh(20),
-
     backgroundColor: colors.background,
   },
 
   saveButton: {
     height: rh(54),
-
     borderRadius: rr(14),
-
     alignItems: 'center',
-
     justifyContent: 'center',
-
     backgroundColor: colors.primary,
   },
 
