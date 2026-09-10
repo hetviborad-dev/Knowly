@@ -10,9 +10,9 @@
             #FFFFFF
         </item>
 
-        <item name="android:windowSplashScreenAnimatedIcon">
-            @drawable/ic_knowly_logo
-        </item>
+<!--        <item name="android:windowSplashScreenAnimatedIcon">-->
+<!--            @drawable/ic_knowly_logo-->
+<!--        </item>-->
 
         <item name="android:statusBarColor">
             #FFFFFF

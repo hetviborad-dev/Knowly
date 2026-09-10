@@ -13,6 +13,7 @@ import FontText from "../common/FontText";
 
 type AuthInputProps = TextInputProps & {
   label: string;
+  backgroundColor?: string;
 };
 
 const AuthInput = ({
@@ -30,7 +31,7 @@ const AuthInput = ({
 
       <TextInput
         {...props}
-        style={styles.input}
+        style={[styles.input,props.backgroundColor && {backgroundColor: props.backgroundColor}]}
         placeholderTextColor={colors.textMuted}
       />
     </View>

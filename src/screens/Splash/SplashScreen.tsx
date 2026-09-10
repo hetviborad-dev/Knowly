@@ -1,117 +1,131 @@
 import React, { useEffect, useRef } from 'react';
 
-import {
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import type {
-  NativeStackScreenProps,
-} from '@react-navigation/native-stack';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+import LottieView from 'lottie-react-native';
 
 import { supabase } from '../../lib/supabase';
 
-import type {
-  RootStackParamList,
-} from '../../types/navigation';
+import type { RootStackParamList } from '../../types/navigation';
 
-import {
-  getOnboardingStep,
-} from '../../services/storageService';
+import { getOnboardingStep } from '../../services/storageService';
 
-import Logo from '../../assets/svgs/logo.svg';
-
-type Props = NativeStackScreenProps<
-  RootStackParamList,
-  'Splash'
->;
+type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
 const SplashScreen = ({ navigation }: Props) => {
   const hasNavigated = useRef(false);
 
+  const animationRef = useRef<LottieView>(null);
+
+  /*
+   * This prevents the session check from
+   * running more than once.
+   */
+  const hasCheckedSession = useRef(false);
+
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+    /*
+     * Start animation immediately.
+     *
+     * No setTimeout here.
+     * No manual play() needed because
+     * autoPlay is enabled.
+     */
+  }, []);
 
-        console.log(
-          'KNOWLY SPLASH SESSION:',
-          session,
-        );
+  /*
+   * -----------------------------------------
+   * CHECK SESSION
+   * -----------------------------------------
+   */
 
-        /*
-         * USER ALREADY LOGGED IN
-         */
+  const checkSession = async () => {
+    if (hasCheckedSession.current) {
+      return;
+    }
 
-        if (session) {
-          navigateOnce('MainTabs');
-          return;
-        }
+    hasCheckedSession.current = true;
 
-        /*
-         * USER NOT LOGGED IN
-         * RESUME ONBOARDING
-         */
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        const onboardingStep =
-          await getOnboardingStep();
+      console.log('KNOWLY SPLASH SESSION:', session);
 
-        console.log(
-          'KNOWLY ONBOARDING STEP:',
-          onboardingStep,
-        );
+      /*
+       * USER ALREADY LOGGED IN
+       */
 
-        switch (onboardingStep) {
-          case 'NAME':
-            navigateOnce('AskName');
-            break;
-
-          case 'CATEGORIES':
-            navigateOnce('SelectCategories');
-            break;
-
-          case 'AUTH':
-            navigateOnce('Auth');
-            break;
-
-          case 'NOTIFICATIONS':
-            navigateOnce('Notifications');
-            break;
-
-          case 'WELCOME':
-          default:
-            navigateOnce('Welcome');
-            break;
-        }
-      } catch (error) {
-        console.error(
-          'Failed to check Knowly session:',
-          error,
-        );
-
-        navigateOnce('Welcome');
+      if (session) {
+        navigateOnce('MainTabs');
+        return;
       }
-    };
+
+      /*
+       * USER NOT LOGGED IN
+       * CHECK ONBOARDING
+       */
+
+      const onboardingStep = await getOnboardingStep();
+
+      console.log('KNOWLY ONBOARDING STEP:', onboardingStep);
+
+      switch (onboardingStep) {
+        case 'NAME':
+          navigateOnce('AskName');
+          break;
+
+        case 'CATEGORIES':
+          navigateOnce('SelectCategories');
+          break;
+
+        case 'AUTH':
+          navigateOnce('Auth');
+          break;
+
+        case 'NOTIFICATIONS':
+          navigateOnce('Notifications');
+          break;
+
+        case 'WELCOME':
+        default:
+          navigateOnce('Welcome');
+          break;
+      }
+    } catch (error) {
+      console.error('Failed to check Knowly session:', error);
+
+      navigateOnce('Welcome');
+    }
+  };
+
+  /*
+   * -----------------------------------------
+   * ANIMATION FINISHED
+   * -----------------------------------------
+   */
+
+  const handleAnimationFinish = () => {
+    console.log('KNOWLY SPLASH ANIMATION FINISHED');
 
     /*
-     * Small delay so the native splash
-     * can smoothly hand over to React Native.
+     * ONLY AFTER THE COMPLETE ANIMATION
+     * DO WE CHECK SESSION.
      */
 
-    const timer = setTimeout(() => {
-      checkSession();
-    }, 1000);
+    checkSession();
+  };
 
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [navigation]);
+  /*
+   * -----------------------------------------
+   * NAVIGATION
+   * -----------------------------------------
+   */
 
-  const navigateOnce = (
-    screen: keyof RootStackParamList,
-  ) => {
+  const navigateOnce = (screen: keyof RootStackParamList) => {
     if (hasNavigated.current) {
       return;
     }
@@ -122,10 +136,19 @@ const SplashScreen = ({ navigation }: Props) => {
   };
 
   return (
+    console.log('KNOWLY SPLASH RENDER'),
     <View style={styles.container}>
-      <Logo
-        width={120}
-        height={120}
+      <LottieView
+        ref={animationRef}
+        source={require('../../assets/svgs/Animation.json')}
+        autoPlay={true}
+        loop={false}
+        onAnimationFinish={handleAnimationFinish}
+        onLayout={() => {
+          animationRef.current?.play(30, 999);
+        }}
+        resizeMode="contain"
+        style={styles.animation}
       />
     </View>
   );
@@ -142,5 +165,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
 
     justifyContent: 'center',
+  },
+
+  animation: {
+    width: 300,
+
+    height: 300,
   },
 });

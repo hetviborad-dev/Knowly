@@ -130,6 +130,7 @@ const AskNameScreen = ({
             style={styles.inputContainer}
           >
             <AuthInput
+            backgroundColor={'#404040'}
               placeholder="Your name"
               value={name}
               onChangeText={
